@@ -7,12 +7,15 @@ import ExecutionContext.Implicits.global
 
 final class Server(){
 
+  private var channel: ServerSocketChannel = _
+  private var selector: Selector = _
+
   def listen(address: InetSocketAddress, blocking: Boolean = true): Unit ={
-    val channel = ServerSocketChannel.open()
+    channel = ServerSocketChannel.open()
     channel.configureBlocking(false)
     channel.socket().bind(address)
 
-    //val selector = Selector.open()
+    selector = Selector.open()
     //channel.register(selector, SelectionKey.OP_ACCEPT)
 //                              |SelectionKey.OP_CONNECT
  //                             |SelectionKey.OP_READ
@@ -26,7 +29,12 @@ final class Server(){
     }
   }
 
-  def tick():Unit = println("reactor loop tick!")
+  def shutdown() ={
+    channel.close()
+    selector.close()
+  }
+
+  private def tick():Unit = () //println("reactor loop tick!")
   
 }
 
