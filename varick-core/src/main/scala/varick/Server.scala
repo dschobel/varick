@@ -57,11 +57,11 @@ final class Server(){
   }
 
   private def doRead(key: SelectionKey){
-      //println(s"${key.attachment.toString} is READable!")
+      println(s"${key.attachment.toString} is READable!")
   }
 
   private def doWrite(key: SelectionKey){
-      //println(s"${key.attachment.toString} is WRITEable!")
+      println(s"${key.attachment.toString} is WRITEable!")
   }
 
   private def doAccept(channel: SocketChannel){

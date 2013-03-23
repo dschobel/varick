@@ -10,7 +10,7 @@ class LifetimeTests extends FunSpec {
 
   describe("Varick") {
     it("it should unbind from on shutdown"){
-      val port = 3031
+      val port = 3030
       val server = net.createServer()
       server.listen(new InetSocketAddress(port),false, true)
       val conn = new Socket("localhost", port)

@@ -36,6 +36,5 @@ class ConnectionTests extends FunSpec with BeforeAndAfter {
       c1.close
       c2.close
     }
-
   }
 }

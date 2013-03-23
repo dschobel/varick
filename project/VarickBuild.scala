@@ -8,6 +8,7 @@ object VarickBuild extends Build {
   lazy val buildSettings = Project.defaultSettings ++  Seq(
     version := "ALPHA", 
     scalaVersion :=  "2.10.1",
+    parallelExecution in Test := false,
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
     libraryDependencies ++= Seq(scalatestLib)
   )
