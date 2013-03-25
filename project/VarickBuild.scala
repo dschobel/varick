@@ -3,7 +3,7 @@ import Keys._
 
 object VarickBuild extends Build {
 
-  lazy val scalatestLib =  "org.scalatest" % "scalatest_2.10.0" % "2.0.M5" % "test"
+  lazy val scalatestLib =  "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test"
 
   lazy val buildSettings = Project.defaultSettings ++  Seq(
     version := "ALPHA", 
