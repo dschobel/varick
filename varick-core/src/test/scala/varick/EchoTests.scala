@@ -11,7 +11,7 @@ class EchoTests extends FunSpec with BeforeAndAfter {
 
   describe("Varick") {
     it("can send and receive data from clients") {
-      val port = 3033
+      val port = 3030
       val server = net.createServer()
       //server.on(:connection) do |connection|
         //connection.on(:data) do |data|
@@ -27,6 +27,7 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       //val out = new PrintWriter(socket.getOutputStream(), true)
       //val in = new BufferedReader(new InputStreamReader(socket.getInputStream()))
       println("sending data")
+      //val out = new PrintWriter(socket.getOutputStream(), true)
       //out.println("hello world")
       println("data sent")
       println("waiting for data")

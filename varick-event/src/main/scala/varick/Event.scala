@@ -11,6 +11,7 @@ trait Event{
   def on(eventName: String, action: Function0[Unit]) = eventHandlers += new Pair(eventName,action)
   def on[T](eventName: String, action: Function1[T,Unit]) = eventHandlersWithArgs += new Pair(eventName,action.asInstanceOf[Function1[Any,Unit]])
 
+  //NOTE: emit blocks, do we want non-blocking variant?
   def emit(eventName: String) = eventHandlers.filter(_._1 == eventName).foreach{_._2()}
   def emit[T](eventName: String, arg: T) = eventHandlersWithArgs.filter(_._1 == eventName).foreach{_._2(arg)}
 }

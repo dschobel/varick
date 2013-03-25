@@ -20,7 +20,7 @@ final class Stream(val id: UUID){
 }
 
 
-final class Server(){
+final class Server(readBufferSz: Int = 1024){
 
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
@@ -30,17 +30,17 @@ final class Server(){
 
   def onAccept(handler: Function1[Stream,Unit]) = acceptHandlers += handler
 
-  def listen(address: InetSocketAddress, blocking: Boolean = true)={
+  def listen(address: InetSocketAddress, blocking: Boolean = true, reuseAddress: Boolean = true)={
     serverChannel = ServerSocketChannel.open()
     serverChannel.configureBlocking(false)
     serverChannel.socket().bind(address)
-    serverChannel.socket().setReuseAddress(true) 
+    serverChannel.socket().setReuseAddress(reuseAddress) 
 
     selector = Selector.open()
     serverChannel.register(selector, SelectionKey.OP_ACCEPT)
 
 
-    val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024) //16kb read buffer
+    val readBuffer: ByteBuffer = ByteBuffer.allocate(readBufferSz)
 
     if (blocking){
       while(true){ tick(readBuffer) }
@@ -82,12 +82,15 @@ final class Server(){
 
   private def doRead(readBuffer: ByteBuffer, key: SelectionKey){
       val stream = key.attachment.asInstanceOf[Stream]
-      //println(s"${stream.id.toString} is READable!")
       val client = key.channel().asInstanceOf[SocketChannel]
       readBuffer.clear()
-      if (client.read(readBuffer) != -1) {
+      val bytesRead = client.read(readBuffer)
+      if (bytesRead != -1) {
         readBuffer.flip()
-        stream.notify_read(readBuffer.array)
+        val data = readBuffer.array.take(bytesRead)
+        val strData = new String(data)
+        println(s"stream $stream.id read: ${strData}")
+        stream.notify_read(data)
         }else{ key.cancel();}
     }
 
