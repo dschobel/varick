@@ -9,7 +9,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
 object Run extends App{
-  println("hello world")
   val echo = net.createServer()
   echo.onAccept((stream: Stream) =>  stream.onData(stream.write(_)))
   echo.listen(new InetSocketAddress(3030))

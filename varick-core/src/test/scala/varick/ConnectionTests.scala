@@ -38,13 +38,9 @@ class ConnectionTests extends FunSpec with BeforeAndAfter {
       assert(c3.isConnected)
       assert(c1.getLocalPort != c2.getLocalPort)
       assert(c2.getLocalPort != c3.getLocalPort)
-      println(s"c1.getLocalPort: ${c1.getLocalPort}")
-      println(s"c2.getLocalPort: ${c2.getLocalPort}")
-      println(s"c3.getLocalPort: ${c3.getLocalPort}")
       c1.close
       c2.close
       c3.close
-      Thread.sleep(5000)
     }
   }
 }

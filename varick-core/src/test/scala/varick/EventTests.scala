@@ -19,12 +19,12 @@ class EventTests extends FunSpec {
       assert(acceptCount === 0)
       println("client 1 connecting...")
       new Socket("localhost", port)
-      Thread.sleep(500) //the joys of testing server events 
+      Thread.sleep(50) //the joys of testing server events 
                          //from the client side...
       assert(acceptCount === 1)
       new Socket("localhost", port)
       println("client 2 connecting...")
-      Thread.sleep(500)
+      Thread.sleep(50)
       assert(acceptCount === 2)
       server.shutdown()
     }
@@ -41,7 +41,7 @@ class EventTests extends FunSpec {
       val client = new Socket("localhost", port)
       val out = new PrintWriter(client.getOutputStream(), true)
       out.println("hello")
-      Thread.sleep(1000)
+      Thread.sleep(50)
       assert(readCount === 1)
       server.shutdown()
     }

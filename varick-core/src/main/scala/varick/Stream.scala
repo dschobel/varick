@@ -8,25 +8,50 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-final class Stream(val id: UUID, private val socket: SocketChannel){
+object Stream{
+  def expandBufferIfNeeded(buffer: ByteBuffer, newdata: Array[Byte], expansionAllowed: Boolean = true):ByteBuffer={
+    if(newdata.length > buffer.remaining()){
+      println("write buffer needs to grow")
+      if(false == expansionAllowed){ throw new java.nio.BufferOverflowException() }
+       Stream.expandBuffer(buffer, newdata)
+    }
+    else{
+      println("appending data to existing write buffer")
+      buffer.put(newdata)
+    }
+  }
+  def expandBuffer(existing: ByteBuffer, newdata: Array[Byte]): ByteBuffer ={
+      val newSz = existing.position() + newdata.length
+      val newbuffer = ByteBuffer.allocate(newSz)
+      existing.flip()
+      newbuffer.put(existing)
+      newbuffer.put(newdata)
+      newbuffer
+  }
+}
+final class Stream(val id: UUID, private val socket: SocketChannel, writeBufferSize: Int = 1024, allowWriteBufferToGrow: Boolean = true){
   private var dataHandlers: ArrayBuffer[Function1[Array[Byte],Unit]] = ArrayBuffer()
-  val writeBuffer: ByteBuffer = ByteBuffer.allocate(1024) //1KB write-buffer per connection
+  var writeBuffer: ByteBuffer =  ByteBuffer.allocate(writeBufferSize)
 
   def close() = socket.close()
   def onData(dataHandler: Function1[Array[Byte],Unit]) = dataHandlers += dataHandler
   def notify_read(data: Array[Byte]) = dataHandlers.foreach{_(data)}
-  def write(data: Array[Byte]): Long = {
-      writeBuffer.put(data)
-      //println(s"writeBuffer.position: ${writeBuffer.position}" )
+  def needs_write() = writeBuffer.position > 0
+  def write(data: Array[Byte]): Option[Int] = {
+
+    writeBuffer = Stream.expandBufferIfNeeded(writeBuffer,data, allowWriteBufferToGrow)
+
+    if(writeBuffer.position() > 0){
+      println(s"write buffer has ${writeBuffer.position} bytes to write" )
       writeBuffer.flip()
-      var written = 0
-      if(writeBuffer.hasRemaining){
-        written = socket.write(writeBuffer)
-        println(s"server wrote $written bytes")
-        writeBuffer.compact()
-      }
-      writeBuffer.flip
-      println(s"writeBuffer.position: ${writeBuffer.position}" )
-      written
+      val written = socket.write(writeBuffer)
+      println(s"server wrote $written bytes")
+      writeBuffer.compact()
+      Some(written)
+    }
+    else{//write buffer is empty...
+      println("write buffer is empty...")
+      None
+    }
   }
 }
