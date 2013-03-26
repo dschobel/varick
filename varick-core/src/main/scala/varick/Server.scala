@@ -8,19 +8,14 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-final class Stream(val id: UUID){
-  private var dataHandlers: ArrayBuffer[Function1[Array[Byte],Unit]] = ArrayBuffer()
-  var writeBuffer: Seq[Byte] = Nil
-
-  def clearWriteBuffer() = writeBuffer = Nil
-  def onData(dataHandler: Function1[Array[Byte],Unit]) = dataHandlers += dataHandler
-  def notify_read(data: Array[Byte]) = dataHandlers.foreach{_(data)}
-  def writePending = writeBuffer.size != 0
-  def write(data: Seq[Byte]) = writeBuffer = writeBuffer ++ data
+object Run extends App{
+  println("hello world")
+  val echo = net.createServer()
+  echo.onAccept((stream: Stream) =>  stream.onData(stream.write(_)))
+  echo.listen(new InetSocketAddress(3030))
 }
 
-
-final class Server(readBufferSz: Int = 1024){
+final class Server(globalReadBufferSz: Int = 1024){
 
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
@@ -30,91 +25,89 @@ final class Server(readBufferSz: Int = 1024){
 
   def onAccept(handler: Function1[Stream,Unit]) = acceptHandlers += handler
 
-  def listen(address: InetSocketAddress, blocking: Boolean = true, reuseAddress: Boolean = true)={
+  def listen(address: InetSocketAddress, blocking: Boolean = true)={
+    selector = Selector.open()
+    val globalReadBuffer = ByteBuffer.allocate(globalReadBufferSz)
+
     serverChannel = ServerSocketChannel.open()
+    serverChannel.socket().setReuseAddress(true) 
     serverChannel.configureBlocking(false)
     serverChannel.socket().bind(address)
-    serverChannel.socket().setReuseAddress(reuseAddress) 
 
-    selector = Selector.open()
     serverChannel.register(selector, SelectionKey.OP_ACCEPT)
 
-
-    val readBuffer: ByteBuffer = ByteBuffer.allocate(readBufferSz)
-
     if (blocking){
-      while(true){ tick(readBuffer) }
+      while(true){ tick(globalReadBuffer) }
     }
     else{//don't block thread (for easier testing)
-      Future{  while(true){tick(readBuffer)}  }
+      Future{  while(true){tick(globalReadBuffer)}  }
     }
   }
 
-  def shutdown()={
-    serverChannel.socket().close()
-    serverChannel.close()
-    val iter = selector.keys().iterator()
-    while(iter.hasNext){
-        val key = iter.next()
-        //iter.remove
-        key.cancel()
-        key.channel().close()
-    }
-    selector.close()
-  }
 
-  private def tick(readBuffer: ByteBuffer) = {
+  private def tick(globalReadBuffer: ByteBuffer):Unit = {
+    println("TICK")
     val available = selector.select() 
 
-    assert(available > 0) //select blocks until we have channel activity so
-                          //this is just a sanity check
+    assert(available > 0) //select blocks until we have channel activity
+                          //so this is just a sanity check
 
-    val iter = selector.selectedKeys().iterator()
+    val keyset = selector.selectedKeys()
+    println(s"keyset.size: ${keyset.size()}")
+    val iter = keyset.iterator()
       while(iter.hasNext){
         val key = iter.next()
-        iter.remove
-        if (key.isReadable){ doRead(readBuffer, key)}
-        else if(key.isWritable){ doWrite(key)}
-        else if(key.isAcceptable){ doAccept(serverChannel.accept()) }
+        iter.remove() //remove key from selection group
+        if (key.isAcceptable){ doAccept(serverChannel) }
+        else if (key.isReadable){ doRead(globalReadBuffer, key)}
     }
   }
 
 
-  private def doRead(readBuffer: ByteBuffer, key: SelectionKey){
+  private def doRead(globalReadBuffer: ByteBuffer, key: SelectionKey){
       val stream = key.attachment.asInstanceOf[Stream]
-      val client = key.channel().asInstanceOf[SocketChannel]
-      readBuffer.clear()
-      val bytesRead = client.read(readBuffer)
+      val channel = key.channel().asInstanceOf[SocketChannel]
+      globalReadBuffer.clear()
+      val bytesRead = channel.read(globalReadBuffer)
       if (bytesRead != -1) {
-        readBuffer.flip()
-        val data = readBuffer.array.take(bytesRead)
-        val strData = new String(data)
-        println(s"stream $stream.id read: ${strData}")
+        globalReadBuffer.flip()
+        val data = globalReadBuffer.array.take(bytesRead)
+        println(s"server got: ${new String(data)}")
         stream.notify_read(data)
-        }else{ key.cancel();}
+      }
+      else{key.cancel()} //nothing to read, cancel registration
     }
 
-  private def doWrite(key: SelectionKey){
-      val stream = key.attachment.asInstanceOf[Stream]
-      //println(s"${stream.id.toString} is WRITEable!")
-  }
 
-  private def writeStream(stream: Stream){
-    assert(stream.writePending)
-    //write_nonblock(stream.writequeue)
-    //stream.clearQueue
-  }
 
-  private def doAccept(channel: SocketChannel){
-    val stream = new Stream(UUID.randomUUID)
-    //println(s"accepting new channel, assigning id ${stream.id.toString}")
-    //println(s"acceptHandlers.size: ${acceptHandlers.size}")
+  private def doAccept(server: ServerSocketChannel){
+    println(s"is server blocking? ${server.isBlocking}")
+    val channel = server.accept()
+    assert(channel != null)//this shouldn't happen since the selector 
+                           //tells us that we had a pending connection
+    val stream = new Stream(UUID.randomUUID, channel)
+    println(s"accepted new channel, assigning id ${stream.id.toString}")
     //make it non-blocking as well
     channel.configureBlocking(false);
     
     //register this channel with the event loop's selector and attach UUID to channel
-    channel.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE).attach(stream);
+    channel.register(selector, SelectionKey.OP_READ).attach(stream);
     acceptHandlers.foreach{_(stream)}
+  }
+
+  def shutdown(forceClose: Boolean = false)={
+    serverChannel.socket().close()
+    serverChannel.close()
+    if(forceClose){ //close all active connections
+      val iter = selector.keys().iterator()
+      while(iter.hasNext){
+        val key = iter.next()
+        key.cancel()
+        key.channel().close()
+        iter.remove()
+      }
+      selector.close()
+    }
   }
 }
 
