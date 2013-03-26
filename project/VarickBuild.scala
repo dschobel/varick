@@ -16,7 +16,7 @@ object VarickBuild extends Build {
   lazy val core = Project(id = "varick-core", 
                           base = file("varick-core"),
                           settings = buildSettings
-                        ).dependsOn(event)
+                        )//.dependsOn(event)
 
   lazy val event = Project(id = "varick-event", 
     base = file("varick-event"),
