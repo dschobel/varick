@@ -8,30 +8,14 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-object Stream{
-  def expandBufferIfNeeded(buffer: ByteBuffer, newdata: Array[Byte], expansionAllowed: Boolean = true):ByteBuffer={
-    if(newdata.length > buffer.remaining()){
-      println("write buffer needs to grow")
-      if(false == expansionAllowed){ throw new java.nio.BufferOverflowException() }
-       Stream.expandBuffer(buffer, newdata)
-    }
-    else{
-      println("appending data to existing write buffer")
-      buffer.put(newdata)
-    }
-  }
-  def expandBuffer(existing: ByteBuffer, newdata: Array[Byte]): ByteBuffer ={
-      val newSz = existing.position() + newdata.length
-      val newbuffer = ByteBuffer.allocate(newSz)
-      existing.flip()
-      newbuffer.put(existing)
-      newbuffer.put(newdata)
-      newbuffer
-  }
-}
-final class Stream(val id: UUID, private val socket: SocketChannel, writeBufferSize: Int = 1024, allowWriteBufferToGrow: Boolean = true){
+final class Stream(val id: UUID, private val socket: SocketChannel, initialWriteBufferSz: Int = 1024, maxWriteBufferSz: Int = 2 * 1024){
+
+  assert(initialWriteBufferSz > -1)
+  assert(maxWriteBufferSz > -1)
+  assert(maxWriteBufferSz >= initialWriteBufferSz)
+
   private var dataHandlers: ArrayBuffer[Function1[Array[Byte],Unit]] = ArrayBuffer()
-  var writeBuffer: ByteBuffer =  ByteBuffer.allocate(writeBufferSize)
+  var writeBuffer: ByteBuffer = ByteBuffer.allocate(initialWriteBufferSz) 
 
   def close() = socket.close()
   def onData(dataHandler: Function1[Array[Byte],Unit]) = dataHandlers += dataHandler
@@ -39,7 +23,10 @@ final class Stream(val id: UUID, private val socket: SocketChannel, writeBufferS
   def needs_write() = writeBuffer.position > 0
   def write(data: Array[Byte]): Option[Int] = {
 
-    writeBuffer = Stream.expandBufferIfNeeded(writeBuffer,data, allowWriteBufferToGrow)
+    val newSz = writeBuffer.position() + data.length
+    if(newSz > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }
+  
+    writeBuffer = ByteBufferUtils.append(writeBuffer,data)
 
     if(writeBuffer.position() > 0){
       println(s"write buffer has ${writeBuffer.position} bytes to write" )
