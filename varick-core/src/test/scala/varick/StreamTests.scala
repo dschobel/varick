@@ -17,8 +17,6 @@ import org.scalatest.concurrent.SocketInterruptor
 class StreamTests extends FunSpec with BeforeAndAfter {
 
   describe("Stream") {
-
-
     it("fires event handlers defined in onData when notify_read is called") {
       val stream = new Stream(UUID.randomUUID,new TestSocketChannel())
       var count = 0
@@ -37,34 +35,16 @@ class StreamTests extends FunSpec with BeforeAndAfter {
       assert(written === data.length)
     }
 
-    it("should throw an overflow exception if the buffer is not allowed to grow"){
+    it("should throw an overflow exception maxWriteBufferSz is exceeded"){
       val stream = new Stream(UUID.randomUUID,new TestSocketChannel(), initialWriteBufferSz = 2, maxWriteBufferSz = 2)
        intercept[java.nio.BufferOverflowException] { stream.write("123".getBytes()) }
     }
 
-    it("should let the buffer grow"){
+    it("should let the buffer grow when maxWriteBufferSz is not exceeded"){
       val stream = new Stream(UUID.randomUUID,new TestSocketChannel(), initialWriteBufferSz = 2)
       stream.write("123".getBytes())
       assert(stream.writeBuffer.capacity === 3)
     }
 
-    /*
-    it("expands the write buffer without destroying existing buffered data"){
-      val existing = ByteBuffer.allocate(10)
-      existing.put("foo".getBytes)
-      val newdata = "bar".getBytes
-      val expanded = Stream.expandBuffer(existing, newdata)
-
-      assert(expanded.position() === 6)
-      expanded.flip()
-      assert(expanded.get() === "f".getBytes.head)
-      assert(expanded.get() === "o".getBytes.head)
-      assert(expanded.get() === "o".getBytes.head)
-      assert(expanded.get() === "b".getBytes.head)
-      assert(expanded.get() === "a".getBytes.head)
-      assert(expanded.get() === "r".getBytes.head)
-      assert(expanded.hasRemaining() === false)
-    }
-    */
   }
 }

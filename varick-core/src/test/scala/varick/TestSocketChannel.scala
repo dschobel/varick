@@ -4,8 +4,17 @@ import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
 import java.nio.ByteBuffer
 
+trait RandomDelay extends TestSocketChannel{
+  private val r = new scala.util.Random()
+  abstract override def write(buffer: ByteBuffer) ={
+    val sleep = r.nextInt(5000) + 1000
+    //println(s"sleeping: $sleep")
+    Thread.sleep(sleep) //sleep between 1 and 6 seconds
+    super.write(buffer)
+  }
+}
 
-class TestSocketChannel(val bytesToWrite: Int = -1) extends SocketChannel(new NOOPSelectorProvider()){
+class TestSocketChannel extends SocketChannel(new NOOPSelectorProvider()){
   def implCloseSelectableChannel(): Unit = ???
   def implConfigureBlocking(x$1: Boolean): Unit = ???
 
@@ -28,15 +37,19 @@ class TestSocketChannel(val bytesToWrite: Int = -1) extends SocketChannel(new NO
   def shutdownOutput(): java.nio.channels.SocketChannel = ???
   def socket(): java.net.Socket = ???
   def write(x$1: Array[java.nio.ByteBuffer],x$2: Int,x$3: Int): Long = 0
-  def write(buffer: java.nio.ByteBuffer): Int = {
+  def write(buffer: ByteBuffer) = write(buffer,-1)
+  def write(buffer: ByteBuffer, bytesToWrite: Int): Int = {
     println("writing in test socket channel!")
-    println("only $bytesToWrite bytes will be written")
-    var res = bytesToWrite
+    if(bytesToWrite != -1)
+      println(s"only $bytesToWrite byte(s) will be written")
+    val initialPos = buffer.position()
     if(bytesToWrite == -1){
-      res = buffer.limit
+      buffer.position(buffer.limit())
     }
-
-    buffer.clear() //TODO: move marker correct amount
-    res
+    else{ 
+      val newPos = Math.min(initialPos + bytesToWrite, buffer.limit())
+        buffer.position(newPos)
+    }
+    buffer.position() - initialPos
   }
 }

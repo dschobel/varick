@@ -8,12 +8,6 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-object Run extends App{
-  val echo = net.createServer()
-  echo.onAccept((stream: Stream) =>  stream.onData(stream.write(_)))
-  echo.listen(new InetSocketAddress(3030))
-}
-
 final class Server(globalReadBufferSz: Int = 1024){
 
   private var serverChannel: ServerSocketChannel = _
