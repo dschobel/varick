@@ -26,21 +26,21 @@ class TestSocketChannelTests extends FunSpec with BeforeAndAfter {
     }
 
     it("should only write as many bytes as specified") {
-      val testSocket = new TestSocketChannel()
       val raw = "foo".getBytes()
       val buffer = ByteBuffer.wrap(raw)
       val bytesToWrite = 1
-      val written = testSocket.write(buffer,bytesToWrite)
+      val testSocket = new TestSocketChannel(bytesToWrite)
+      val written = testSocket.write(buffer)
       assert(written === bytesToWrite)
       assert(buffer.position === bytesToWrite)
     }
 
     it("should only write as many bytes as specified #2") {
-      val testSocket = new TestSocketChannel() 
       val raw = "foo".getBytes()
       val buffer = ByteBuffer.wrap(raw)
       val bytesToWrite = 2
-      val written = testSocket.write(buffer,bytesToWrite)
+      val testSocket = new TestSocketChannel(bytesToWrite) 
+      val written = testSocket.write(buffer)
       assert(written === bytesToWrite)
       assert(buffer.position === bytesToWrite)
     }

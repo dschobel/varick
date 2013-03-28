@@ -9,8 +9,8 @@ object VarickBuild extends Build {
     version := "ALPHA", 
     scalaVersion :=  "2.10.1",
 
-    //parallelExecution in Test := false,
-    fork in Test := true,
+    parallelExecution in Test := false,
+    //fork in Test := true,
 
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps"),
     libraryDependencies ++= Seq(scalatestLib)

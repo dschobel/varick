@@ -38,7 +38,7 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       }
       println(s"finished readLine, result is: ${new String(readBuffer.take(response))}")
       assert(message.length === response)
-      socket.close
+      socket.close()
       echo.shutdown()
     }
   }

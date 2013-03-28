@@ -14,7 +14,7 @@ trait RandomDelay extends TestSocketChannel{
   }
 }
 
-class TestSocketChannel extends SocketChannel(new NOOPSelectorProvider()){
+class TestSocketChannel(val maxBytes: Int = -1)  extends SocketChannel(new NOOPSelectorProvider()){
   def implCloseSelectableChannel(): Unit = ???
   def implConfigureBlocking(x$1: Boolean): Unit = ???
 
@@ -37,17 +37,15 @@ class TestSocketChannel extends SocketChannel(new NOOPSelectorProvider()){
   def shutdownOutput(): java.nio.channels.SocketChannel = ???
   def socket(): java.net.Socket = ???
   def write(x$1: Array[java.nio.ByteBuffer],x$2: Int,x$3: Int): Long = 0
-  def write(buffer: ByteBuffer) = write(buffer,-1)
-  def write(buffer: ByteBuffer, bytesToWrite: Int): Int = {
-    println("writing in test socket channel!")
-    if(bytesToWrite != -1)
-      println(s"only $bytesToWrite byte(s) will be written")
+  def write(buffer: ByteBuffer): Int = {
+    if(maxBytes != -1)
+      println(s"only $maxBytes byte(s) will be written")
     val initialPos = buffer.position()
-    if(bytesToWrite == -1){
+    if(maxBytes == -1){
       buffer.position(buffer.limit())
     }
     else{ 
-      val newPos = Math.min(initialPos + bytesToWrite, buffer.limit())
+        val newPos = Math.min(initialPos + maxBytes, buffer.limit())
         buffer.position(newPos)
     }
     buffer.position() - initialPos

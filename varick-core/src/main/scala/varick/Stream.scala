@@ -8,8 +8,7 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-final class Stream(val id: UUID, private val socket: SocketChannel, initialWriteBufferSz: Int = 1024, maxWriteBufferSz: Int = 2 * 1024){
-
+final class Stream(val id: UUID, key: SelectionKey, socket: SocketChannel, initialWriteBufferSz : Int = 1024, maxWriteBufferSz: Int = 2 * 1024){
   assert(initialWriteBufferSz > -1)
   assert(maxWriteBufferSz > -1)
   assert(maxWriteBufferSz >= initialWriteBufferSz)
@@ -20,8 +19,21 @@ final class Stream(val id: UUID, private val socket: SocketChannel, initialWrite
   def close() = socket.close()
   def onData(dataHandler: Function1[Array[Byte],Unit]) = dataHandlers += dataHandler
   def notify_read(data: Array[Byte]) = dataHandlers.foreach{_(data)}
-  def needs_write() = writeBuffer.position > 0
-  def write(data: Array[Byte]): Option[Int] = {
+  def needs_write = writeBuffer.position > 0
+  def write()= {
+    if(writeBuffer.position() > 0){
+      println(s"write buffer has ${writeBuffer.position} bytes to write" )
+      writeBuffer.flip()
+      val written = socket.write(writeBuffer)
+      writeBuffer.compact()
+    }
+    else{
+      println("WARN: write buffer is empty. Passing empty buffers to write is probably not what you intended")
+      0
+    }
+
+  }
+  def write(data: Array[Byte])= {
 
     val newSz = writeBuffer.position() + data.length
     if(newSz > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }
@@ -34,11 +46,17 @@ final class Stream(val id: UUID, private val socket: SocketChannel, initialWrite
       val written = socket.write(writeBuffer)
       println(s"server wrote $written bytes")
       writeBuffer.compact()
-      Some(written)
+      if(needs_write){
+        //if a socket needs to write, register interest    
+        //with selector
+        println("registering this socket for OP_WRITE availability")
+        key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE)//.attach(this)
+      }
+      written
     }
-    else{//write buffer is empty...
-      println("write buffer is empty...")
-      None
+    else{//write buffer is empty... should probably log a warning...
+      println("WARN: write buffer is empty. Passing empty buffers to write is probably not what you intended")
+      0
     }
   }
 }
