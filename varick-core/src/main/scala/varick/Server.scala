@@ -10,7 +10,7 @@ import collection.mutable.{ArrayBuffer,Set}
 
 object Echo extends App{
   val echo = net.createServer()
-  echo.onAccept((stream) => { stream.onData{stream.write(_)}})
+  echo.onAccept((stream) => { stream.onData{(data) =>{ stream.write(data); stream.close()}}})
   echo.listen(new InetSocketAddress(3031))
 }
 
@@ -44,39 +44,48 @@ final class Server(globalReadBufferSz: Int = 1024){
     }
   }
 
+  private def debugKey(key: SelectionKey): Unit = {
+    println(s"\treadable? ${key.isReadable()}  " +
+      "writable? ${key.isWritable()}   acceptable?  ${key.isAcceptable}")
+  }
 
   private def tick(globalReadBuffer: ByteBuffer):Unit = {
-    //println("TICK")
+    println(s"selector.keys().size(): ${selector.keys().size()}")
     val available = selector.select() 
+    val all_iter = selector.keys().iterator()
+    while(all_iter.hasNext){
+      val key = all_iter.next()
+      debugKey(key)
+    }
+    println(s"$available keys are ready for operations")
 
     assert(available > 0) //select blocks until we have channel activity
                           //so this is just a sanity check
 
     val keyset = selector.selectedKeys()
-    //println(s"keyset.size: ${keyset.size()}")
     val iter = keyset.iterator()
     while(iter.hasNext){
       val key = iter.next()
       iter.remove() //remove key from selection group
       if (key.isAcceptable){ doAccept(key, serverChannel) }
-      if (key.isReadable){ doRead(globalReadBuffer, key)}
-      if (key.isWritable){ doWrite(key)}
+      else if (key.isReadable){ doRead(globalReadBuffer, key)}
+      else if (key.isWritable){ doWrite(key)}
     }
   }
 
   private def doWrite(key: SelectionKey){
       val stream = key.attachment.asInstanceOf[Stream]
-      println(s"stream ${stream.id} is ready to write!")
       val channel = key.channel().asInstanceOf[SocketChannel]
-      if(stream.writeBuffer.position() == 0)
-      {
-        println("no data to write, cancelling key")
-        key.cancel()
-      }
-      else
+      if(stream.needs_write)
       {
         //do the write
         stream.write()
+      }
+      else
+      {
+        println("no data to write, cancelling WRITE registration")
+        val newops = key.interestOps() & ~SelectionKey.OP_WRITE 
+        key.interestOps(newops)//nothing to write, cancel WRITE registration
       }
   }
 
@@ -88,18 +97,14 @@ final class Server(globalReadBufferSz: Int = 1024){
       if (bytesRead != -1) {
         globalReadBuffer.flip()
         val data = globalReadBuffer.array.take(bytesRead)
-        println(s"server got: ${new String(data)}")
+        //println(s"server got: ${new String(data)}")
         stream.notify_read(data)
-      }
-      else{
-        //key.cancel() //nothing to read, cancel registration
       }
     }
 
 
 
   private def doAccept(key: SelectionKey, server: ServerSocketChannel){
-    println(s"is server blocking? ${server.isBlocking}")
     val channel = server.accept()
     assert(channel != null)//this shouldn't happen since the selector 
                            //tells us that we had a pending connection
@@ -107,7 +112,7 @@ final class Server(globalReadBufferSz: Int = 1024){
     println(s"accepted new channel, assigning id ${stream.id.toString}")
     //make it non-blocking as well
     channel.configureBlocking(false);
-    
+
     //register this channel with the event loop's selector and attach UUID to channel
     //all channels are monitored for READability 
     channel.register(selector, SelectionKey.OP_READ).attach(stream);
