@@ -6,8 +6,7 @@ object ByteBufferUtils{
 
   def append(existing: ByteBuffer, data: Array[Byte]): ByteBuffer = {
     if(data.length > existing.remaining()){
-      val newSz = existing.position() + data.length
-      val newbuffer = ByteBuffer.allocate(newSz)
+      val newbuffer = ByteBuffer.allocate(existing.position() + data.length)
       existing.flip()
       newbuffer.put(existing)
       newbuffer.put(data)
