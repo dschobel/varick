@@ -10,8 +10,6 @@ object VarickBuild extends Build {
     scalaVersion :=  "2.10.1",
 
     parallelExecution in Test := false,
-    //fork in Test := true,
-
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps"),
     libraryDependencies ++= Seq(scalatestLib)
   )
@@ -19,9 +17,13 @@ object VarickBuild extends Build {
   lazy val core = Project(id = "varick-core", 
                           base = file("varick-core"),
                           settings = buildSettings
-                        )//.dependsOn(event)
+                        )
 
   lazy val event = Project(id = "varick-event", 
     base = file("varick-event"),
     settings = buildSettings)
+
+  lazy val examples = Project(id = "varick-examples", 
+    base = file("varick-examples"),
+    settings = buildSettings).dependsOn(core)
 }
