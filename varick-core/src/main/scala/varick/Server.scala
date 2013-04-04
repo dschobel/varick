@@ -8,12 +8,6 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.{ArrayBuffer,Set}
 
-object Echo extends App{
-  val echo = net.createServer()
-  echo.onAccept((stream) => { stream.onData{(data) =>{ stream.write(data); stream.close()}}})
-  echo.listen(new InetSocketAddress(3031))
-}
-
 final class Server(globalReadBufferSz: Int = 1024){
 
   private var serverChannel: ServerSocketChannel = _
@@ -31,6 +25,8 @@ final class Server(globalReadBufferSz: Int = 1024){
 
     serverChannel = ServerSocketChannel.open()
     serverChannel.socket().setReuseAddress(true) 
+    //serverChannel.socket().setReceiveBufferSize(2000)
+    println(s"receive buffer size is ${serverChannel.socket().getReceiveBufferSize}")
     serverChannel.configureBlocking(false)
     serverChannel.socket().bind(address)
 
@@ -46,18 +42,19 @@ final class Server(globalReadBufferSz: Int = 1024){
 
   private def debugKey(key: SelectionKey): Unit = {
     println(s"\treadable? ${key.isReadable()}  " +
-      "writable? ${key.isWritable()}   acceptable?  ${key.isAcceptable}")
+      s"writable? ${key.isWritable()}   acceptable?  ${key.isAcceptable}")
   }
 
   private def tick(globalReadBuffer: ByteBuffer):Unit = {
-    println(s"selector.keys().size(): ${selector.keys().size()}")
+    //println(s"selector.keys().size(): ${selector.keys().size()}")
     val available = selector.select() 
-    val all_iter = selector.keys().iterator()
+    /*val all_iter = selector.keys().iterator()
     while(all_iter.hasNext){
       val key = all_iter.next()
       debugKey(key)
     }
-    println(s"$available keys are ready for operations")
+    */
+    //println(s"$available keys are ready for operations")
 
     assert(available > 0) //select blocks until we have channel activity
                           //so this is just a sanity check
@@ -66,9 +63,10 @@ final class Server(globalReadBufferSz: Int = 1024){
     val iter = keyset.iterator()
     while(iter.hasNext){
       val key = iter.next()
+      //debugKey(key)
       iter.remove() //remove key from selection group
-      if (key.isAcceptable){ doAccept(key, serverChannel) }
-      else if (key.isReadable){ doRead(globalReadBuffer, key)}
+      if (key.isReadable){ doRead(globalReadBuffer, key)}
+      else if (key.isAcceptable){ doAccept(key, serverChannel) }
       else if (key.isWritable){ doWrite(key)}
     }
   }
@@ -93,13 +91,19 @@ final class Server(globalReadBufferSz: Int = 1024){
       val stream = key.attachment.asInstanceOf[Stream]
       val channel = key.channel().asInstanceOf[SocketChannel]
       globalReadBuffer.clear()
-      val bytesRead = channel.read(globalReadBuffer)
+      var bytesRead = 0
+      try{
+        bytesRead = channel.read(globalReadBuffer)
+      } catch{ 
+        case ioe: java.io.IOException => { stream.close(); key.cancel(); }
+      }
       if (bytesRead != -1) {
         globalReadBuffer.flip()
         val data = globalReadBuffer.array.take(bytesRead)
         //println(s"server got: ${new String(data)}")
         stream.notify_read(data)
       }
+      else{ stream.close(); key.cancel() }
     }
 
 
@@ -109,7 +113,7 @@ final class Server(globalReadBufferSz: Int = 1024){
     assert(channel != null)//this shouldn't happen since the selector 
                            //tells us that we had a pending connection
     val stream = new Stream(UUID.randomUUID,key,channel.asInstanceOf[SocketChannel])
-    println(s"accepted new channel, assigning id ${stream.id.toString}")
+    //println(s"accepted new channel, assigning id ${stream.id.toString}")
     //make it non-blocking as well
     channel.configureBlocking(false);
 
