@@ -8,7 +8,12 @@ import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
-final class Stream(val id: UUID, key: SelectionKey, socket: SocketChannel, initialWriteBufferSz : Int = 1024, maxWriteBufferSz: Int = 2 * 1024){
+final class Stream(val id: UUID,
+                       key: SelectionKey,
+                       socket: SocketChannel,
+                       initialWriteBufferSz : Int = 1024,
+                       maxWriteBufferSz: Int = 2 * 1024)
+ {
   assert(initialWriteBufferSz > -1)
   assert(maxWriteBufferSz > -1)
   assert(maxWriteBufferSz >= initialWriteBufferSz)
@@ -17,7 +22,7 @@ final class Stream(val id: UUID, key: SelectionKey, socket: SocketChannel, initi
   var writeBuffer: ByteBuffer = ByteBuffer.allocate(initialWriteBufferSz) 
 
   def close() ={ 
-    println(s"closing socket associated with stream $id")
+    //println(s"closing socket associated with stream $id")
     socket.close()
   }
 
@@ -27,24 +32,20 @@ final class Stream(val id: UUID, key: SelectionKey, socket: SocketChannel, initi
   def needs_write = writeBuffer.position > 0
 
   def write(data: Array[Byte]): Int= {
-
-    val newSz = writeBuffer.position() + data.length
-    if(newSz > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }
-  
+    if(writeBuffer.position() + data.length > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }
     writeBuffer = ByteBufferUtils.append(writeBuffer,data)
     write()
   }
 
   def write()= {
     if(needs_write){
-      println(s"write buffer has ${writeBuffer.position} bytes to write" )
+      //println(s"write buffer has ${writeBuffer.position} bytes to write" )
       writeBuffer.flip()
       val written = socket.write(writeBuffer)
       writeBuffer.compact()
       if(needs_write){
-        //if a socket needs to write, register 
-        //interest with selector
-        println("registering this socket for OP_WRITE availability")
+        //if a socket needs to write, register interest with selector
+        //println("registering this socket for OP_WRITE availability")
         val newops = key.interestOps() & SelectionKey.OP_WRITE
         key.interestOps(newops)
       }
