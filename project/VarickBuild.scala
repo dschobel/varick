@@ -3,8 +3,8 @@ import Keys._
 
 object VarickBuild extends Build {
 
-  lazy val http_coreLib =  "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test"
-  lazy val scalatestLib =  "org.apache.httpcomponents" % "httpcore-nio" % "4.2.3"
+  lazy val scalatestLib =  "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test"
+  lazy val http_coreLib =  "org.apache.httpcomponents" % "httpcore-nio" % "4.2.3"
 
 
   lazy val buildSettings = Project.defaultSettings ++  Seq(
