@@ -1,17 +1,20 @@
 package varick.examples
 
 import java.net.InetSocketAddress
-import varick._
+import varick.{TCPProtocol, Server}
+import varick.http._
 
-object EchoServer {
+
+object HttpServer {
+
   def main(args: Array[String]): Unit = {
-    var port = 3030
+    var port = 8080
     if(args.length > 0) { port = args.head.toInt }
 
-    val echo = net.createServer()
-    echo.onRead{(stream, data) => stream.write(data)}
+
+    val http = httpserver.createServer()
 
     println(s"listening on port $port")
-    echo.listen(new InetSocketAddress(port))
+    http.listen(new InetSocketAddress(port))
   }
 }
