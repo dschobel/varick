@@ -10,7 +10,7 @@ import org.scalatest.BeforeAndAfter
 class ConnectionTests extends FunSpec with BeforeAndAfter {
 
   val port = 3030
-  var server: Server = _
+  var server: TCPServer = _
 
   before {
     server = net.createServer()
@@ -28,7 +28,7 @@ class ConnectionTests extends FunSpec with BeforeAndAfter {
     }
 
     it("accepts multiple conections"){
-      server.onAccept(_ => println("server accepted a connection!"))
+      //server.connectionMade( println("server accepted a connection!"))
       println("multiple connections...")
       val c1 = new Socket("localhost", port) 
       val c2 = new Socket("localhost", port)

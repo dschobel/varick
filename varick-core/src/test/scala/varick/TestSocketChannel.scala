@@ -31,15 +31,13 @@ class TestSocketChannel(val maxBytes: Int = -1)  extends SocketChannel(new NOOPS
   def isConnected(): Boolean = ???
   def isConnectionPending(): Boolean = ???
   def read(x$1: Array[java.nio.ByteBuffer],x$2: Int,x$3: Int): Long = ???
-  def read(x$1: java.nio.ByteBuffer): Int = ???
+  def read(x$1: java.nio.ByteBuffer): Int = 0
   def setOption[T](x$1: java.net.SocketOption[T],x$2: T): java.nio.channels.SocketChannel = ???
   def shutdownInput(): java.nio.channels.SocketChannel = ???
   def shutdownOutput(): java.nio.channels.SocketChannel = ???
   def socket(): java.net.Socket = ???
   def write(x$1: Array[java.nio.ByteBuffer],x$2: Int,x$3: Int): Long = 0
   def write(buffer: ByteBuffer): Int = {
-    if(maxBytes != -1)
-      println(s"only $maxBytes byte(s) will be written")
     val initialPos = buffer.position()
     if(maxBytes == -1){
       buffer.position(buffer.limit())

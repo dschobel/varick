@@ -7,27 +7,51 @@ import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 
-object HTTPImpl extends TCPProtocol{
-  val response = StringResponse("hello form varick!")
-  val CRLF: Array[Byte] = Array(13,10)
-  val EOM = CRLF ++ CRLF
+class HTTPImpl() extends TCPProtocol {
 
-  private var stream: Stream = null;
+  val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
+  var connection: TCPConnection = null
+  private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
 
-  override def connectionMade(stream: Stream) = this.stream = stream 
+  override def build(conn: TCPConnection): HTTPImpl ={
+    val res = new HTTPImpl()
+    res.connection = conn
+    res
+  }
 
-  override def onRead(handler: Function2[Stream,Array[Byte],Unit]) = ???
-
-  override def dataReceived(stream: Stream, data: Array[Byte]) ={
-    if(data.containsSlice(EOM)){
-      stream.write(response.headerBytes)
-      stream.write(response.content.getBytes)
-      stream.close()
-    }
-    else{
-      //buffer message
+  override def read(handlers: Seq[Function2[TCPProtocol, Array[Byte],Unit]]) = {
+    connection.read match{
+      case Some(data) => {
+        readBuffer.put(data)
+        val pos = readBuffer.position
+        println(s"readBuffer.position: $pos")
+        if(data.containsSlice(HTTPImpl.EOM)){
+          readBuffer.flip
+          val messageBytes = readBuffer.array.take(pos)
+          readBuffer.clear()
+          handlers.foreach{_(this,messageBytes)}
+          readHandlers.foreach{_(connection,messageBytes)}
+          connection.write(HTTPImpl.response.headerBytes)
+          connection.write(HTTPImpl.response.content.getBytes)
+          connection.close()
+        }
+      }
+      case None => { println("WARN: didn't get any data") }
     }
   }
+  override def write(bytes: Array[Byte]) = connection.write(bytes)
+  override def needs_write = connection.needs_write
+  override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
+    readHandlers += handler
+  }
+
+
+}
+
+object HTTPImpl {
+  val response = StringResponse("hello from varick!")
+  val CRLF: Array[Byte] = Array(13,10)
+  val EOM = CRLF ++ CRLF
 }
 
 case class StringResponse(content: String) {
@@ -47,5 +71,5 @@ object StringResponse{
 }
 
 object httpserver {
-  def createServer(): Server = new Server(HTTPImpl)
+  def createServer(): TCPServer = new TCPServer(new HTTPImpl())
 }

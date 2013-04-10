@@ -1,7 +1,7 @@
 package varick.examples
 
 import java.net.InetSocketAddress
-import varick.{TCPProtocol, Server}
+//import varick.{TCPProtocol, Server}
 import varick.http._
 
 

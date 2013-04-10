@@ -13,7 +13,7 @@ object VarickBuild extends Build {
 
     parallelExecution in Test := false,
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps"),
-    libraryDependencies ++= Seq(scalatestLib)
+    libraryDependencies ++= Seq(scalatestLib, http_coreLib)
   )
 
   lazy val core = Project(id = "varick-core", 
