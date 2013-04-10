@@ -21,10 +21,6 @@ object VarickBuild extends Build {
                           settings = buildSettings
                         )
 
-  lazy val event = Project(id = "varick-event", 
-    base = file("varick-event"),
-    settings = buildSettings)
-
   lazy val http = Project(id = "varick-http", 
     base = file("varick-http"),
     settings = buildSettings).dependsOn(core)
