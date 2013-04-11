@@ -86,10 +86,11 @@ class TCPConnection (val id: UUID,
       writeBuffer.flip()
       var written = 0
       try{
+        if(socket == null){ println("socket is null...")}
         written = socket.write(writeBuffer)
       }catch{
         case ioe: java.io.IOException => { 
-          println(s"ERROR: caught ${ioe.getMessage} when trying to write to $id.toString")
+          println(s"ERROR: caught ${ioe.getMessage} when trying to write to $id\n\n${ioe.getStackTrace.take(6).mkString("\n")}")
           socket.close()
           key.cancel()
           return -1

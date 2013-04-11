@@ -27,5 +27,5 @@ object VarickBuild extends Build {
 
   lazy val examples = Project(id = "varick-examples", 
     base = file("varick-examples"),
-    settings = buildSettings).dependsOn(http)
+    settings = buildSettings).dependsOn(core)
 }

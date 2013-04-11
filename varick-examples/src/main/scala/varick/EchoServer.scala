@@ -9,7 +9,8 @@ object EchoServer {
     if(args.length > 0) { port = args.head.toInt }
 
     val echo = net.createServer()
-    echo.onRead{(conn, data) => conn.write(data);conn.connection.close()}
+    echo.onRead{(conn: BasicTCP, data: Array[Byte]) => conn.write(data); ()}
+    echo.onRead{(conn: TCPCodec, data: Array[Byte]) => conn.write(data); conn.connection.close()}
 
     println(s"listening on port $port")
     echo.listen(new InetSocketAddress(port))

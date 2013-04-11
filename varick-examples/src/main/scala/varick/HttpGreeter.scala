@@ -1,8 +1,7 @@
 package varick.examples
 
 import java.net.InetSocketAddress
-//import varick.{TCPProtocol, Server}
-import varick.http._
+//import varick.http._
 
 
 object HttpServer {
@@ -12,9 +11,10 @@ object HttpServer {
     if(args.length > 0) { port = args.head.toInt }
 
 
-    val http = httpserver.createServer()
+    //val http = httpserver.createServer(HTTPImpl)
+    //http.
 
     println(s"listening on port $port")
-    http.listen(new InetSocketAddress(port))
+    //http.listen(new InetSocketAddress(port))
   }
 }

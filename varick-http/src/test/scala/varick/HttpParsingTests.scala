@@ -17,7 +17,7 @@ import org.scalatest.concurrent.SocketInterruptor
 class HttpParsingTests extends FunSpec with BeforeAndAfter {
 
   describe("Stream") {
-    it()
+    ()
     //it("fires event handlers defined in onData when notify_read is called") { }
   }
 }

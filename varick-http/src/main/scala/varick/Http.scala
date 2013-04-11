@@ -7,32 +7,28 @@ import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 
-class HTTPImpl() extends TCPProtocol {
+object HTTPBuilder extends ProtocolBuilder[HTTPCodec]{
+  override def build(conn: TCPConnection): HTTPCodec = new HTTPCodec(conn)
+}
 
+class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
-  var connection: TCPConnection = null
   private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
 
-  override def build(conn: TCPConnection): HTTPImpl ={
-    val res = new HTTPImpl()
-    res.connection = conn
-    res
-  }
-
-  override def read(handlers: Seq[Function2[TCPProtocol, Array[Byte],Unit]]) = {
+  override def read(handlers: Seq[Function2[TCPCodec, Array[Byte],Unit]]) = {
     connection.read match{
       case Some(data) => {
         readBuffer.put(data)
         val pos = readBuffer.position
         println(s"readBuffer.position: $pos")
-        if(data.containsSlice(HTTPImpl.EOM)){
+        if(data.containsSlice(HTTPCodec.EOM)){
           readBuffer.flip
           val messageBytes = readBuffer.array.take(pos)
           readBuffer.clear()
           handlers.foreach{_(this,messageBytes)}
           readHandlers.foreach{_(connection,messageBytes)}
-          connection.write(HTTPImpl.response.headerBytes)
-          connection.write(HTTPImpl.response.content.getBytes)
+          connection.write(HTTPCodec.response.headerBytes)
+          connection.write(HTTPCodec.response.content.getBytes)
           connection.close()
         }
       }
@@ -48,7 +44,7 @@ class HTTPImpl() extends TCPProtocol {
 
 }
 
-object HTTPImpl {
+object HTTPCodec {
   val response = StringResponse("hello from varick!")
   val CRLF: Array[Byte] = Array(13,10)
   val EOM = CRLF ++ CRLF
@@ -71,5 +67,5 @@ object StringResponse{
 }
 
 object httpserver {
-  def createServer(): TCPServer = new TCPServer(new HTTPImpl())
+  def createServer(): TCPServer[TCPCodec] = new TCPServer(HTTPBuilder)
 }

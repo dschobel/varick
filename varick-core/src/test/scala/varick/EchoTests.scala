@@ -17,7 +17,8 @@ class EchoTests extends FunSpec with BeforeAndAfter {
     it("can send and receive data from clients") {
       val port = 3030
       val echo = net.createServer()
-      echo.onRead{(conn,data) =>  conn.write(data) }
+
+      echo.onRead{(any : AnyRef,data: Array[Byte]) =>  ()}//conn.write(data) }
       echo.listen(new InetSocketAddress(port),blocking = false)
 
       val socket = new Socket("localhost", port)

@@ -9,79 +9,22 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
 
-abstract class TCPProtocol{
-
-  var connection: TCPConnection
-
-  //interface for server
-  def build(conn: TCPConnection): TCPProtocol
-  //def connectionMade(conn: TCPConnection) 
-  //def dataReceived(conn: TCPConnection, data: Array[Byte])
-  //def bytesToWrite(conn: TCPConnection): Array[Bytes]
-
-  def needs_write: Boolean
-
-  //server tells us that a socket we previously requested to be monitored for
-  //WRITEability is now ready
-  def write(): Unit = connection.write()
-
-  //server tells us a socket is readable, read some data and notify
-  //the handlers if we have a complete protocol message
-  def read(handlers: Seq[Function2[TCPProtocol, Array[Byte],Unit]])
-
-  //interface for clients to interact with protocol
-  
-  //add a handler function which will fire on protocol messages
-  def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = ()
-
-  //add a handler function which will fire on new connections
-  def onConnect(handler: Function1[TCPConnection,Unit]) = ()
-
-  //schedule the data to be written
-  def write(bytes: Array[Byte]) = ()
-}
-
 
 /**
-  * a thin wrapper class which passes all reads and writes directly to the underlying TCP transport without further processing
+  * a server for handling protocols built on top of TCP
+  * @param <T> the tcp-based protocol to be en/decoded 
+  * @param builder the ProtocolBuilder which instantiates a new codec for en/decoding the underlying stream of bytes
   */
-class BasicTCP() extends TCPProtocol{
-  private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
-  var connection: TCPConnection = null
-  override def build(conn: TCPConnection): BasicTCP = {
-    val res = new BasicTCP()
-    res.connection = conn
-    res
-  }
-
-  override def read(handlers: Seq[Function2[TCPProtocol, Array[Byte],Unit]]) = {
-    connection.read match{
-      case Some(data) => {
-        handlers.foreach{_(this,data)}
-        readHandlers.foreach{_(connection,data)}
-      }
-      case None => ()
-    }
-  }
-  override def write(bytes: Array[Byte]) = connection.write(bytes)
-  override def needs_write = connection.needs_write
-  override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
-    println("adding handlers")
-    readHandlers += handler
-  }
-}
-
-
-
-final class TCPServer(private val protocol: TCPProtocol){
+final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[TCPProtocol,Array[Byte],Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[_ >: T,Array[Byte],Unit]] = ArrayBuffer()
 
-
-  def onRead(handler: Function2[TCPProtocol,Array[Byte],Unit]) = readHandlers += handler
+  //add a new callback for read events of the underlying codec
+  //ie; a new HTTP request shows up
+  def onRead(handler: Function2[_ >: T,Array[Byte],Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -168,8 +111,9 @@ final class TCPServer(private val protocol: TCPProtocol){
                              //tells us that we had a pending connection
                              //and we handle IO exception above
 
+
     val transport = new TCPConnection(UUID.randomUUID, key, channel)
-    val impl  = protocol.build(transport)
+    val impl = builder.build(transport)
 
     //make it non-blocking
     channel.configureBlocking(false);
@@ -186,12 +130,12 @@ final class TCPServer(private val protocol: TCPProtocol){
   * @param key the SelectionKey whose socket should be written
   */
   private def doWrite(key: SelectionKey){
-      val proto = key.attachment.asInstanceOf[TCPProtocol]
+      val codec = key.attachment.asInstanceOf[TCPCodec]
       //val bytes = def bytesToWrite(): Array[Bytes]
-      if(proto.needs_write)
+      if(codec.needs_write)
       {
         //do the write
-        proto.write()
+        codec.write()
       }
       else
       {
@@ -207,9 +151,13 @@ final class TCPServer(private val protocol: TCPProtocol){
   * @param globalReadBuffer
   * @param key
   */
-  private def doRead(key: SelectionKey){
-      val proto = key.attachment.asInstanceOf[TCPProtocol]
-      proto.read(readHandlers)
+private def doRead(key: SelectionKey){
+
+      val codec = key.attachment.asInstanceOf[T]
+
+      //dispatch read handlers to codec so that it can call
+      //them if it determines that a complete message has arrived
+      codec.read(readHandlers) 
     }
 
 
@@ -239,5 +187,5 @@ object net {
   * builds a new TCP server
  e* @return
   */
-  def createServer(): TCPServer = new TCPServer(new BasicTCP())
+  def createServer() = new TCPServer(TCPBuilder)
 }
