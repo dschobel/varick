@@ -1,7 +1,6 @@
 package varick
 
 import java.nio.channels.SocketChannel
-import java.nio.channels.spi.SelectorProvider
 import java.nio.ByteBuffer
 
 trait RandomDelay extends TestSocketChannel{

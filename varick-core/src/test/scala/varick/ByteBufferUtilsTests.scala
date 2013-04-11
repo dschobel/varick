@@ -4,9 +4,6 @@ import java.nio.ByteBuffer
 
 import org.scalatest.FunSpec
 import org.scalatest.BeforeAndAfter
-import org.scalatest.time.SpanSugar._
-import org.scalatest.concurrent.Timeouts._
-import org.scalatest.concurrent.SocketInterruptor
 
 class ByteBufferUtilsTests extends FunSpec with BeforeAndAfter {
 

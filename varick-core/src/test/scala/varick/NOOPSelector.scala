@@ -1,7 +1,6 @@
 package varick
 
 
-import java.nio.channels.spi.SelectorProvider
 import java.nio.channels.Selector
 
 class NOOPSelector extends Selector {

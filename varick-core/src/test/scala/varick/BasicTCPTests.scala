@@ -2,9 +2,6 @@ package varick
 
 import org.scalatest.FunSpec
 import org.scalatest.BeforeAndAfter
-import org.scalatest.time.SpanSugar._
-import org.scalatest.concurrent.Timeouts._
-import org.scalatest.concurrent.SocketInterruptor
 
 class BasicTCPTests extends FunSpec with BeforeAndAfter {
 

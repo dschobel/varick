@@ -3,8 +3,6 @@ package varick
 import java.nio.channels.{SocketChannel, SelectionKey}
 import java.nio.ByteBuffer
 import java.util.UUID
-import collection.mutable.ArrayBuffer
-import scala.util.Try
 
 object TCPConnection{
   val GlobalReadBufferSz: Int = 1024

@@ -3,7 +3,7 @@ package varick
 import collection.mutable.ArrayBuffer
 
 /**
-  * Repesents a codec built on a TCP stream
+  * Represents a codec built on a TCP stream
   */
 abstract class TCPCodec(val connection: TCPConnection) {
 
@@ -35,7 +35,7 @@ abstract class TCPCodec(val connection: TCPConnection) {
 }
 
 
-trait ProtocolBuilder[+T <: TCPCodec]{
+trait ProtocolBuilder[T <: TCPCodec]{
   def build(conn: TCPConnection): T
 }
 
@@ -60,7 +60,6 @@ class BasicTCP(c: TCPConnection) extends TCPCodec(c){
     }
   }
   override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
-    println("adding handlers")
     readHandlers += handler
   }
 }

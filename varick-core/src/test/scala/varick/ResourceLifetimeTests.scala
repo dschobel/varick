@@ -3,7 +3,6 @@ package varick
 import java.net.{InetSocketAddress,Socket}
 
 import org.scalatest.FunSpec
-import org.scalatest.BeforeAndAfter
 
 
 class ResourceLifetimeTests extends FunSpec {

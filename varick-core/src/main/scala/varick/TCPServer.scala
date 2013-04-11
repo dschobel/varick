@@ -2,7 +2,6 @@ package varick
 
 import java.net.InetSocketAddress
 import java.nio.channels.{SocketChannel, ServerSocketChannel, Selector, SelectionKey}
-import java.nio.ByteBuffer
 import java.util.UUID
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global

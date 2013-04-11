@@ -1,7 +1,6 @@
 package varick
 
 import java.net.{InetSocketAddress,Socket}
-import java.io.PrintWriter
 
 import org.scalatest.FunSpec
 import org.scalatest.BeforeAndAfter

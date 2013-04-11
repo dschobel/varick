@@ -1,7 +1,5 @@
 package varick.http
 
-import java.net.InetSocketAddress
-import java.nio.channels.{SocketChannel, ServerSocketChannel}
 import java.nio.ByteBuffer
 import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
@@ -15,40 +13,43 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
   private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
 
-  override def read(handlers: Seq[Function2[TCPCodec, Array[Byte],Unit]]) = {
+  override def read(handlers: Seq[Function2[this.type, Array[Byte],Unit]]) = {
     connection.read match{
       case Some(data) => {
         readBuffer.put(data)
         val pos = readBuffer.position
-        println(s"readBuffer.position: $pos")
+        //println(s"readBuffer.position: $pos")
         if(data.containsSlice(HTTPCodec.EOM)){
           readBuffer.flip
           val messageBytes = readBuffer.array.take(pos)
           readBuffer.clear()
           handlers.foreach{_(this,messageBytes)}
           readHandlers.foreach{_(connection,messageBytes)}
-          connection.write(HTTPCodec.response.headerBytes)
-          connection.write(HTTPCodec.response.content.getBytes)
-          connection.close()
+        }
+        else{
+          println("incomplete request, suppressing read event")
         }
       }
       case None => { println("WARN: didn't get any data") }
     }
   }
-  override def write(bytes: Array[Byte]) = connection.write(bytes)
-  override def needs_write = connection.needs_write
   override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
     readHandlers += handler
   }
-
-
 }
 
 object HTTPCodec {
-  val response = StringResponse("hello from varick!")
   val CRLF: Array[Byte] = Array(13,10)
   val EOM = CRLF ++ CRLF
+
+  def StringResponder(content: String, connection: TCPConnection){
+    val response = StringResponse(content)
+    connection.write(response.headerBytes)
+    connection.write(response.content.getBytes)
+    connection.close()
+  }
 }
+
 
 case class StringResponse(content: String) {
   val responseStatus = "HTTP/1.1 200 OK\r\n"
@@ -67,5 +68,5 @@ object StringResponse{
 }
 
 object httpserver {
-  def createServer(): TCPServer[TCPCodec] = new TCPServer(HTTPBuilder)
+  def createServer() = new TCPServer(HTTPBuilder)
 }
