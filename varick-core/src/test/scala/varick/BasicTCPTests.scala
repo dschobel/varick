@@ -9,9 +9,8 @@ class BasicTCPTests extends FunSpec with BeforeAndAfter {
     it("fires event handlers defined on read") {
       val tcp: TCPCodec = new BasicTCP(new StubTCPConnection)
       var count = 0
-      val fx: (TCPConnection, Array[Byte]) => Unit ={  (_,_) => println("increment");count += 1 }
 
-      tcp.onRead(fx)
+      tcp.onRead((_,_) => {println("increment");count += 1})
       assert(count === 0)
       tcp.read(List())
       assert(count === 1)

@@ -5,15 +5,22 @@ import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 
+class HTTPData{
+  def toBytes(): Array[Byte] = Array()
+}
+object HTTPData{
+  def apply(data: Array[Byte]) = new HTTPData()
+}
+
 object HTTPBuilder extends ProtocolBuilder[HTTPCodec]{
   override def build(conn: TCPConnection): HTTPCodec = new HTTPCodec(conn)
 }
 
-class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
+class HTTPCodec(connection: TCPConnection) extends TCPCodec[HTTPData](connection){
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
-  private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[TCPConnection,HTTPData,Unit]] = ArrayBuffer()
 
-  override def read(handlers: Seq[Function2[this.type, Array[Byte],Unit]]) = {
+  override def read(handlers: Seq[Function2[TCPCodec[HTTPData], HTTPData,Unit]]) = {
     connection.read match{
       case Some(data) => {
         readBuffer.put(data)
@@ -23,8 +30,9 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
           readBuffer.flip
           val messageBytes = readBuffer.array.take(pos)
           readBuffer.clear()
-          handlers.foreach{_(this,messageBytes)}
-          readHandlers.foreach{_(connection,messageBytes)}
+          val http = HTTPData(messageBytes)
+          handlers.foreach{_(this,http)}
+          readHandlers.foreach{_(connection,http)}
         }
         else{
           println("incomplete request, suppressing read event")
@@ -33,7 +41,7 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
       case None => { println("WARN: didn't get any data") }
     }
   }
-  override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
+  override def onRead(handler: Function2[TCPConnection,HTTPData,Unit]) = {
     readHandlers += handler
   }
 }
@@ -68,5 +76,5 @@ object StringResponse{
 }
 
 object httpserver {
-  def createServer() = new TCPServer(HTTPBuilder)
+  def createServer() : TCPServer[HTTPCodec,HTTPData]= new TCPServer(HTTPBuilder)
 }

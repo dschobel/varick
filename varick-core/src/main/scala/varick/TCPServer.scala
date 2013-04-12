@@ -8,22 +8,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
 
 
-
 /**
-  * a server for handling protocols built on top of TCP
-  * @param <T> the tcp-based protocol to be en/decoded 
-  * @param builder the ProtocolBuilder which instantiates a new codec for en/decoding the underlying stream of bytes
-  */
-final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
+ * a server for handling protocols built on top of TCP
+ * @param builder the ProtocolBuilder which instantiates a new codec for en/decoding the underlying stream of bytes
+ * @tparam T the tcp-based protocol to be en/decoded
+ */
+final class TCPServer[T <: TCPCodec[D],D](private val builder: ProtocolBuilder[T]){
 
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[_ >: T,Array[Byte],Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[TCPCodec[D],D,Unit]] = ArrayBuffer()
 
-  //add a new callback for read events of the underlying codec
-  //ie; a new HTTP request shows up
-  def onRead(handler: Function2[_ >: T,Array[Byte],Unit]) = readHandlers += handler
+  //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
+  def onRead(handler: Function2[TCPCodec[D],D,Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -129,7 +127,7 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   * @param key the SelectionKey whose socket should be written
   */
   private def doWrite(key: SelectionKey){
-      val codec = key.attachment.asInstanceOf[TCPCodec]
+      val codec = key.attachment.asInstanceOf[TCPCodec[D]]
       //val bytes = def bytesToWrite(): Array[Bytes]
       if(codec.needs_write)
       {
@@ -147,16 +145,19 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
   /**
   * Tell the transport layer to read
-  * @param globalReadBuffer
   * @param key
   */
 private def doRead(key: SelectionKey){
 
-      val codec = key.attachment.asInstanceOf[T]
+      val codec = key.attachment.asInstanceOf[TCPCodec[D]]
+      //T <: TCPCodec
+
+      //readhandlers: ArrayBuffer[Function2[_ >: T,T#ProtocolData,Unit]] 
 
       //dispatch read handlers to codec so that it can call
       //them if it determines that a complete message has arrived
-      codec.read(readHandlers) 
+      val seqHandlers = readHandlers.toSeq
+      codec.read(seqHandlers)
     }
 
 
@@ -184,7 +185,7 @@ private def doRead(key: SelectionKey){
 object net {
   /**
   * builds a new TCP server
- e* @return
+  * @return
   */
-  def createServer() = new TCPServer(TCPBuilder)
+  def createServer(): TCPServer[BasicTCP,Array[Byte]] = new TCPServer(TCPBuilder)
 }

@@ -5,7 +5,9 @@ import collection.mutable.ArrayBuffer
 /**
   * Represents a codec built on a TCP stream
   */
-abstract class TCPCodec(val connection: TCPConnection) {
+abstract class TCPCodec[D](val connection: TCPConnection) {
+
+  //type ProtocolData
 
   //interface for server
   //def connectionMade(conn: TCPConnection) 
@@ -21,11 +23,11 @@ abstract class TCPCodec(val connection: TCPConnection) {
 
   //server tells us a socket is readable, read some data and notify
   //the handlers if we have a complete protocol message
-  def read(handlers: Seq[Function2[this.type, Array[Byte],Unit]])
+  def read(handlers: Seq[Function2[TCPCodec[D], D,Unit]])
 
   //interface for clients to interact with protocol
   //add a handler function which will fire on protocol messages
-  def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = ()
+  def onRead(handler: Function2[TCPConnection, D,Unit]) = ()
 
   //add a handler function which will fire on new connections
   def onConnect(handler: Function1[TCPConnection,Unit]) = ()
@@ -35,7 +37,7 @@ abstract class TCPCodec(val connection: TCPConnection) {
 }
 
 
-trait ProtocolBuilder[T <: TCPCodec]{
+trait ProtocolBuilder[T <: TCPCodec[_]]{
   def build(conn: TCPConnection): T
 }
 
@@ -46,11 +48,12 @@ object TCPBuilder extends ProtocolBuilder[BasicTCP]{
 /**
   * a thin wrapper class which passes all reads and writes directly to the underlying TCP transport without any en/decoding
   */
-class BasicTCP(c: TCPConnection) extends TCPCodec(c){
+class BasicTCP(c: TCPConnection) extends TCPCodec[Array[Byte]](c){
 
+  //type ProtocolData = Array[Byte]
   private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
 
-  override def read(handlers: Seq[Function2[this.type, Array[Byte],Unit]]) = {
+  override def read(handlers: Seq[Function2[TCPCodec[Array[Byte]], Array[Byte],Unit]]) = {
     connection.read match{
       case Some(data) => {
         handlers.foreach{_(this,data)}

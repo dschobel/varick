@@ -17,7 +17,7 @@ object HttpServer {
     val http = httpserver.createServer()
 
   val dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-    http.onRead((c: TCPCodec, d: Array[Byte]) => {
+    http.onRead((c: TCPCodec[HTTPData], d: HTTPData) => {
         //println(s"got: ${new String(d)}" )
         HTTPCodec.StringResponder(s"hello world, it is currently ${dateFormat.format(new Date)}\n", c.connection)
         c.connection.close()
