@@ -1,7 +1,5 @@
 package varick
 
-import collection.mutable.ArrayBuffer
-
 trait ProtocolBuilder[T <: TCPCodec]{
   def build(conn: TCPConnection): T
 }
@@ -15,7 +13,7 @@ trait Serializable{
   */
 abstract class TCPCodec(val connection: TCPConnection) {
 
-  type ProtocolData //<: Serializable
+  type ProtocolData <: Serializable
 
   //interface for server
   //def connectionMade(conn: TCPConnection) 

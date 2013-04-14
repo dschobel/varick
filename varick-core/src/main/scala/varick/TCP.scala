@@ -1,8 +1,5 @@
 package varick
 
-import collection.mutable.ArrayBuffer
-
-
 object TCPBuilder extends ProtocolBuilder[BasicTCP]{
   override def build(conn: TCPConnection) = new BasicTCP(conn)
 }
@@ -16,11 +13,13 @@ class BasicTCP(c: TCPConnection) extends TCPCodec(c){
     def toBytes() = repr
   }
 
-  type ProtocolData = Array[Byte] //WrappedByteArray
+  type ProtocolData = WrappedByteArray
 
-  //implicit def byteArrayWrapper(bytes: Array[Byte]): WrappedByteArray = new WrappedByteArray(bytes)
+  implicit def byteToArrayWrapper(bytes: Array[Byte]): WrappedByteArray = new WrappedByteArray(bytes)
 
-  override def read(handlers: Seq[Function2[TCPCodec, Array[Byte],Unit]]) = {
+  implicit def wrappedArrayToBytes(wrapped: WrappedByteArray): Array[Byte] = wrapped.toBytes()
+
+  override def read(handlers: Seq[Function2[TCPCodec, WrappedByteArray,Unit]]) = {
     connection.read match{
       case Some(data) => {
         handlers.foreach{_(this,data)}

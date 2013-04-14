@@ -128,7 +128,6 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   */
   private def doWrite(key: SelectionKey){
       val codec = key.attachment.asInstanceOf[TCPCodec]
-      //val bytes = def bytesToWrite(): Array[Bytes]
       if(codec.needs_write)
       {
         //do the write
@@ -150,14 +149,10 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 private def doRead(key: SelectionKey){
 
       val codec = key.attachment.asInstanceOf[TCPCodec]
-      //T <: TCPCodec
-
-      //readhandlers: ArrayBuffer[Function2[_ >: T,T#ProtocolData,Unit]] 
 
       //dispatch read handlers to codec so that it can call
       //them if it determines that a complete message has arrived
-      val seqHandlers = readHandlers.toSeq
-      codec.read(seqHandlers)
+      codec.read(readHandlers)
     }
 
 

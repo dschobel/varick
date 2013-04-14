@@ -18,7 +18,7 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       val port = 3030
       val echo = net.createServer()
 
-      echo.onRead{(tcp, data) => tcp.connection.write(data.asInstanceOf[Array[Byte]]) }
+      echo.onRead{(tcp, data) => tcp.connection.write(data.toBytes()) }
       echo.listen(new InetSocketAddress(port),blocking = false)
 
       val socket = new Socket("localhost", port)
@@ -28,7 +28,7 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       val message = "hello from the client!"
       out.println(message)
       println("client: data sent")
-      val readBuffer = Array.fill(message.length){0.asInstanceOf[Byte]}
+      val readBuffer: Array[Byte] = Array.fill(message.length){0}
       var response: Int = 0
       println("client: waiting for data")
       implicit val killit = new SocketInterruptor(socket)

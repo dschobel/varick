@@ -5,7 +5,7 @@ import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 
-class HTTPData{
+class HTTPData extends Serializable {
   def toBytes(): Array[Byte] = Array()
 }
 object HTTPData{

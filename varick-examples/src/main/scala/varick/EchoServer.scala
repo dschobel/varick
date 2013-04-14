@@ -11,7 +11,7 @@ object EchoServer {
     val echo = net.createServer()
     echo.onRead{(conn, data) => 
       {
-        conn.write(data.asInstanceOf[Array[Byte]])
+        conn.write(data.toBytes())
         conn.connection.close()
       }
     }
