@@ -18,7 +18,7 @@ object HttpServer {
 
     val http = httpserver.createServer()
 
-    http.onRead((c, d) => {
+    http.onRead((c: HTTPCodec, d: HTTPData) => {
         HTTPCodec.StringResponder(s"hello world, it is currently ${dateFormat.format(new Date)}\n", c.connection)
         c.connection.close()
       })

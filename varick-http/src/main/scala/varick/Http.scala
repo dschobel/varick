@@ -5,8 +5,8 @@ import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 
-class HTTPData extends Serializable {
-  def toBytes(): Array[Byte] = Array()
+class HTTPData {
+
 }
 object HTTPData{
   def apply(data: Array[Byte]) = new HTTPData()
@@ -22,9 +22,7 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
 
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
 
-  override def read(handlers: Seq[Function2[TCPCodec, HTTPData,Unit]]) = {
-    connection.read match{
-      case Some(data) => {
+  override def process(data: Array[Byte])  = {
         readBuffer.put(data)
         val pos = readBuffer.position
         //println(s"readBuffer.position: $pos")
@@ -32,16 +30,13 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
           readBuffer.flip
           val messageBytes = readBuffer.array.take(pos)
           readBuffer.clear()
-          val http = HTTPData(messageBytes)
-          handlers.foreach{_(this,http)}
+          Some(HTTPData(messageBytes))
         }
         else{
           println("incomplete request, suppressing read event")
+          None
         }
       }
-      case None => { println("WARN: didn't get any data") }
-    }
-  }
 }
 
 object HTTPCodec {

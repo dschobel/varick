@@ -13,10 +13,10 @@ object TCPConnection{
   * State and errorhandling for a connected TCP socket
   */
 class TCPConnection (val id: UUID, 
-                           key: SelectionKey, 
-                           socket: SocketChannel, 
-                           initialWriteBufferSz : Int = 1024, 
-                           maxWriteBufferSz: Int = 16 * 1024) {
+                         key: SelectionKey, 
+                         socket: SocketChannel, 
+                         initialWriteBufferSz : Int = 1024, 
+                         maxWriteBufferSz: Int = 16 * 1024) {
 
   assert(initialWriteBufferSz > 0)
   assert(maxWriteBufferSz > 0)
@@ -47,7 +47,7 @@ class TCPConnection (val id: UUID,
           return None
         }
       }
-      if (bytesRead != -1) {
+      if (bytesRead >= 0) {
         TCPConnection.GlobalReadBuffer.flip()
         val data = TCPConnection.GlobalReadBuffer.array.take(bytesRead)
         return Some(data)
@@ -56,7 +56,7 @@ class TCPConnection (val id: UUID,
         //handlers.foreach{_(this,data)}
         //println(s"server got: ${new String(data)}")
       }
-      else{ socket.close(); key.cancel(); return None }
+      else{ socket.close(); return None }
   }
 
   /**
@@ -65,9 +65,9 @@ class TCPConnection (val id: UUID,
   def needs_write = writeBuffer.position > 0
 
   /**
-   *
-   * @param data
-   * @return
+   * write
+   * @param data the bytes to write to the socket
+   * @return the number of bytes written
    */
   def write(data: Array[Byte]): Int= {
     if(writeBuffer.position() + data.length > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }

@@ -18,10 +18,10 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[TCPCodec,TCPCodec#ProtocolData,Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[T,T#ProtocolData,Unit]] = ArrayBuffer()
 
   //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
-  def onRead(handler: Function2[TCPCodec,TCPCodec#ProtocolData,Unit]) = readHandlers += handler
+  def onRead(handler: Function2[T,T#ProtocolData,Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -77,14 +77,14 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
     assert(available > 0) //select blocks until we have channel activity
                           //so this is just a sanity check
 
-    val keyset = selector.selectedKeys()
-    val iter = keyset.iterator()
+    val iter = selector.selectedKeys().iterator()
     while(iter.hasNext){
       val key = iter.next()
-      iter.remove() //remove key from selection group
       if ( key.isReadable){ doRead(key)}
       else if (key.isAcceptable){ doAccept(key, serverChannel) }
       else if (key.isWritable){ doWrite(key)}
+
+      iter.remove() //key has been handled, remove it from selection group
     }
   }
 
@@ -101,7 +101,8 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
       case ioe: java.io.IOException => { 
           println(s"ERROR: caught ${ioe.getMessage} when trying to ACCEPT")
           key.cancel()
-          return ()
+          key attach null   //detach TCPConnection object
+          return()
         }
     }
     assert(channel != null)  //shouldn't happen because the selector 
@@ -113,12 +114,12 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
     val impl = builder.build(transport)
 
     //make it non-blocking
-    channel.configureBlocking(false);
+    channel.configureBlocking(false)
 
     //register this channel with the event loop's selector and 
     //attach protocol implementation to channel
     //all channels are monitored for READability 
-    channel.register(selector, SelectionKey.OP_READ).attach(impl);
+    channel.register(selector, SelectionKey.OP_READ,impl)
     //protocol.connectionMade(transport)
   }
 
@@ -127,7 +128,7 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   * @param key the SelectionKey whose socket should be written
   */
   private def doWrite(key: SelectionKey){
-      val codec = key.attachment.asInstanceOf[TCPCodec]
+      val codec = key.attachment.asInstanceOf[T]
       if(codec.needs_write)
       {
         //do the write
@@ -143,34 +144,36 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
 
   /**
-  * Tell the transport layer to read
-  * @param key
+  * Read some bytes from the TCP connection, delegate bytes to protocol
+  * for encoding and processing and then trigger read callbacks
+  * @param key the SelectionKey which is ready for a read
   */
-private def doRead(key: SelectionKey){
+  private def doRead(key: SelectionKey){
 
-      val codec = key.attachment.asInstanceOf[TCPCodec]
+    val codec = key.attachment.asInstanceOf[T]
 
-      //dispatch read handlers to codec so that it can call
-      //them if it determines that a complete message has arrived
-      codec.read(readHandlers)
-    }
-
+    for {
+      bytes <- codec.connection.read()
+      result <- codec.process(bytes)
+    } readHandlers.foreach{_(codec,result)}
+  }
 
 
   /**
   * Close the server socket channel and stop accepting new requests
   * @param forceClose if true, close all existing client connections and shutdown the selector
   */
-  def shutdown(forceClose: Boolean = false)={
-    serverChannel.socket().close()
-    serverChannel.close()
-    if(forceClose){ //close all active connections
+  def shutdown(closeExistingConnections: Boolean = false)={
+    serverChannel.close() //stop accepting new connections
+    if(closeExistingConnections){ //close all active connections
       val iter = selector.keys().iterator()
       while(iter.hasNext){
         val key = iter.next()
-        key.cancel()
-        key.channel().close()
-        iter.remove()
+        try{
+          key.channel().close()
+        }catch{
+          case exn: Exception => println("caught: " +  exn.getMessage() + " while trying to close a client channel")
+        }
       }
       selector.close()
     }

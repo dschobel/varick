@@ -11,7 +11,8 @@ object EchoServer {
     val echo = net.createServer()
     echo.onRead{(conn, data) => 
       {
-        conn.write(data.toBytes())
+        println(s"server got: ${new String(data)}")
+        conn.write(data)
         conn.connection.close()
       }
     }
