@@ -13,15 +13,15 @@ import collection.mutable.ArrayBuffer
  * @param builder the ProtocolBuilder which instantiates a new codec for en/decoding the underlying stream of bytes
  * @tparam T the tcp-based protocol to be en/decoded
  */
-final class TCPServer[T <: TCPCodec[D],D](private val builder: ProtocolBuilder[T]){
+final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[TCPCodec[D],D,Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[TCPCodec,TCPCodec#ProtocolData,Unit]] = ArrayBuffer()
 
   //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
-  def onRead(handler: Function2[TCPCodec[_],D,Unit]) = readHandlers += handler
+  def onRead(handler: Function2[TCPCodec,TCPCodec#ProtocolData,Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -127,7 +127,7 @@ final class TCPServer[T <: TCPCodec[D],D](private val builder: ProtocolBuilder[T
   * @param key the SelectionKey whose socket should be written
   */
   private def doWrite(key: SelectionKey){
-      val codec = key.attachment.asInstanceOf[TCPCodec[D]]
+      val codec = key.attachment.asInstanceOf[TCPCodec]
       //val bytes = def bytesToWrite(): Array[Bytes]
       if(codec.needs_write)
       {
@@ -149,7 +149,7 @@ final class TCPServer[T <: TCPCodec[D],D](private val builder: ProtocolBuilder[T
   */
 private def doRead(key: SelectionKey){
 
-      val codec = key.attachment.asInstanceOf[TCPCodec[D]]
+      val codec = key.attachment.asInstanceOf[TCPCodec]
       //T <: TCPCodec
 
       //readhandlers: ArrayBuffer[Function2[_ >: T,T#ProtocolData,Unit]] 
@@ -187,5 +187,5 @@ object net {
   * builds a new TCP server
   * @return
   */
-  def createServer(): TCPServer[BasicTCP,Array[Byte]] = new TCPServer(TCPBuilder)
+  def createServer() = new TCPServer(TCPBuilder)
 }

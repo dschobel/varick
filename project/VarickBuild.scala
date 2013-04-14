@@ -10,9 +10,10 @@ object VarickBuild extends Build {
   lazy val buildSettings = Project.defaultSettings ++  Seq(
     version := "ALPHA", 
     scalaVersion :=  "2.10.1",
-
-    parallelExecution in Test := false,
+    fork in Test := true,
+    //parallelExecution in Test := false,
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-language:postfixOps"),
+
     libraryDependencies ++= Seq(scalatestLib, http_coreLib)
   )
 

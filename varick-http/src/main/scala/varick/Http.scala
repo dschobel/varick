@@ -16,10 +16,13 @@ object HTTPBuilder extends ProtocolBuilder[HTTPCodec]{
   override def build(conn: TCPConnection): HTTPCodec = new HTTPCodec(conn)
 }
 
-class HTTPCodec(connection: TCPConnection) extends TCPCodec[HTTPData](connection){
+class HTTPCodec(connection: TCPConnection) extends TCPCodec(connection){
+
+  type ProtocolData = HTTPData 
+
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
 
-  override def read(handlers: Seq[Function2[TCPCodec[HTTPData], HTTPData,Unit]]) = {
+  override def read(handlers: Seq[Function2[TCPCodec, HTTPData,Unit]]) = {
     connection.read match{
       case Some(data) => {
         readBuffer.put(data)
@@ -71,5 +74,5 @@ object StringResponse{
 }
 
 object httpserver {
-  def createServer() : TCPServer[HTTPCodec,HTTPData]= new TCPServer(HTTPBuilder)
+  def createServer() : TCPServer[HTTPCodec]= new TCPServer(HTTPBuilder)
 }
