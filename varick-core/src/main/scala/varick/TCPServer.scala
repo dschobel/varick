@@ -21,7 +21,7 @@ final class TCPServer[T <: TCPCodec[D],D](private val builder: ProtocolBuilder[T
   private val readHandlers: ArrayBuffer[Function2[TCPCodec[D],D,Unit]] = ArrayBuffer()
 
   //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
-  def onRead(handler: Function2[TCPCodec[D],D,Unit]) = readHandlers += handler
+  def onRead(handler: Function2[TCPCodec[_],D,Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 

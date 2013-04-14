@@ -2,44 +2,6 @@ package varick
 
 import collection.mutable.ArrayBuffer
 
-/**
-  * Represents a codec built on a TCP stream
-  */
-abstract class TCPCodec[D](val connection: TCPConnection) {
-
-  //type ProtocolData
-
-  //interface for server
-  //def connectionMade(conn: TCPConnection) 
-  //def dataReceived(conn: TCPConnection, data: Array[Byte])
-  //def bytesToWrite(conn: TCPConnection): Array[Bytes]
-
-  //server asks whether codec wants to write
-  def needs_write: Boolean = connection.needs_write
-
-  //server tells us that a socket we previously requested to be monitored for
-  //write capacity is now ready
-  def write(): Unit = connection.write()
-
-  //server tells us a socket is readable, read some data and notify
-  //the handlers if we have a complete protocol message
-  def read(handlers: Seq[Function2[TCPCodec[D], D,Unit]])
-
-  //interface for clients to interact with protocol
-  //add a handler function which will fire on protocol messages
-  def onRead(handler: Function2[TCPConnection, D,Unit]) = ()
-
-  //add a handler function which will fire on new connections
-  def onConnect(handler: Function1[TCPConnection,Unit]) = ()
-
-  //schedule the data to be written
-  def write(bytes: Array[Byte]) = connection.write(bytes)
-}
-
-
-trait ProtocolBuilder[T <: TCPCodec[_]]{
-  def build(conn: TCPConnection): T
-}
 
 object TCPBuilder extends ProtocolBuilder[BasicTCP]{
   override def build(conn: TCPConnection) = new BasicTCP(conn)
@@ -51,18 +13,13 @@ object TCPBuilder extends ProtocolBuilder[BasicTCP]{
 class BasicTCP(c: TCPConnection) extends TCPCodec[Array[Byte]](c){
 
   //type ProtocolData = Array[Byte]
-  private val readHandlers: ArrayBuffer[Function2[TCPConnection,Array[Byte],Unit]] = ArrayBuffer()
 
   override def read(handlers: Seq[Function2[TCPCodec[Array[Byte]], Array[Byte],Unit]]) = {
     connection.read match{
       case Some(data) => {
         handlers.foreach{_(this,data)}
-        readHandlers.foreach{_(connection,data)}
       }
       case None => ()
     }
-  }
-  override def onRead(handler: Function2[TCPConnection,Array[Byte],Unit]) = {
-    readHandlers += handler
   }
 }

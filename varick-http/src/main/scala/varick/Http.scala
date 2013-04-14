@@ -18,7 +18,6 @@ object HTTPBuilder extends ProtocolBuilder[HTTPCodec]{
 
 class HTTPCodec(connection: TCPConnection) extends TCPCodec[HTTPData](connection){
   val readBuffer: ByteBuffer = ByteBuffer.allocate(16 * 1024)
-  private val readHandlers: ArrayBuffer[Function2[TCPConnection,HTTPData,Unit]] = ArrayBuffer()
 
   override def read(handlers: Seq[Function2[TCPCodec[HTTPData], HTTPData,Unit]]) = {
     connection.read match{
@@ -32,7 +31,6 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec[HTTPData](connection
           readBuffer.clear()
           val http = HTTPData(messageBytes)
           handlers.foreach{_(this,http)}
-          readHandlers.foreach{_(connection,http)}
         }
         else{
           println("incomplete request, suppressing read event")
@@ -40,9 +38,6 @@ class HTTPCodec(connection: TCPConnection) extends TCPCodec[HTTPData](connection
       }
       case None => { println("WARN: didn't get any data") }
     }
-  }
-  override def onRead(handler: Function2[TCPConnection,HTTPData,Unit]) = {
-    readHandlers += handler
   }
 }
 

@@ -9,7 +9,7 @@ import org.scalatest.BeforeAndAfter
 class ConnectionTests extends FunSpec with BeforeAndAfter {
 
   val port = 3030
-  var server: TCPServer[BasicTCP] = _
+  var server: TCPServer[BasicTCP,Array[Byte]] = _
 
   before {
     server = net.createServer()
