@@ -3,7 +3,7 @@ package varick.examples
 import java.util.Date
 import java.net.InetSocketAddress
 import java.text.SimpleDateFormat
-import varick.TCPCodec
+import varick.{TCPCodec,TCPConnection}
 import varick.http._
 
 
@@ -18,9 +18,9 @@ object HttpServer {
 
     val http = httpserver.createServer()
 
-    http.onRead((c: HTTPCodec, d: HTTPData) => {
-        HTTPCodec.StringResponder(s"hello world, it is currently ${dateFormat.format(new Date)}\n", c.connection)
-        c.connection.close()
+    http.onRead((conn: TCPConnection, d: HTTPData) => {
+        HTTPCodec.StringResponder(s"hello world, it is currently ${dateFormat.format(new Date)}\n", conn)
+        conn.close()
       })
 
     println(s"listening on port $port")

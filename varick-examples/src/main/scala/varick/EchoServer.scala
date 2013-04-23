@@ -13,7 +13,7 @@ object EchoServer {
       {
         println(s"server got: ${new String(data)}")
         conn.write(data)
-        conn.connection.close()
+        conn.close()
       }
     }
 

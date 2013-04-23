@@ -18,10 +18,10 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   private var serverChannel: ServerSocketChannel = _
   private var selector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[T,T#ProtocolData,Unit]] = ArrayBuffer()
+  private val readHandlers: ArrayBuffer[Function2[TCPConnection,T#ProtocolData,Unit]] = ArrayBuffer()
 
   //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
-  def onRead(handler: Function2[T,T#ProtocolData,Unit]) = readHandlers += handler
+  def onRead(handler: Function2[TCPConnection,T#ProtocolData,Unit]) = readHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -155,7 +155,7 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
     for {
       bytes <- codec.connection.read()
       result <- codec.process(bytes)
-    } readHandlers.foreach{_(codec,result)}
+    } readHandlers.foreach{_(codec.connection,result)}
   }
 
 
