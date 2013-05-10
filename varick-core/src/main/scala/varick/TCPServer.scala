@@ -6,6 +6,7 @@ import java.util.UUID
 import scala.concurrent._
 import scala.concurrent.ExecutionContext.Implicits.global
 import collection.mutable.ArrayBuffer
+import scala.collection.JavaConversions._
 
 
 /**
@@ -16,12 +17,16 @@ import collection.mutable.ArrayBuffer
 final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
   private var serverChannel: ServerSocketChannel = _
-  private var selector: Selector = _
+  private var SystemSelector: Selector = _
 
-  private val readHandlers: ArrayBuffer[Function2[TCPConnection,T#ProtocolData,Unit]] = ArrayBuffer()
+  private val readHandlers = ArrayBuffer[Function2[TCPConnection,T#ProtocolData,Unit]]()
+  private val connHandlers = ArrayBuffer[Function1[TCPConnection,Unit]]()
 
-  //add a new callback for read events of the underlying codec (ie; handle a new HTTP request)
-  def onRead(handler: Function2[TCPConnection,T#ProtocolData,Unit]) = readHandlers += handler
+  //register a new callback for request events of the underlying codec (ie; handle a new HTTP request)
+  def onRequest(handler: Function2[TCPConnection,T#ProtocolData,Unit]) = readHandlers += handler
+
+  //register a new callback for a connection event
+  def onConnection(handler: Function1[TCPConnection,Unit]) = connHandlers += handler
 
   def socket = serverChannel.socket
 
@@ -31,14 +36,14 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
    * @param blocking block on this method
    */
   def listen(address: InetSocketAddress, blocking: Boolean = true)={
-    selector = Selector.open()
+    SystemSelector = Selector.open()
 
     serverChannel = ServerSocketChannel.open()
     serverChannel.socket().setReuseAddress(true) 
     serverChannel.configureBlocking(false)
     serverChannel.socket().bind(address)
 
-    serverChannel.register(selector, SelectionKey.OP_ACCEPT)
+    serverChannel.register(SystemSelector, SelectionKey.OP_ACCEPT)
 
     if (blocking){
       while(true){ tick() }
@@ -66,26 +71,45 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   * Execute one round of the event loop 
   */
   private def tick():Unit = {
-    /*val all_iter = selector.keys().iterator()
-    println(s"selector.keys().size(): ${selector.keys().size()}")
+    /*val all_iter = SystemSelector.keys().iterator()
+    println(s"SystemSelector.keys().size(): ${SystemSelector.keys().size()}")
     while(all_iter.hasNext){
       val key = all_iter.next()
       debugKey(key)
     }*/
 
-    val available = selector.select() 
+    val available = SystemSelector.select() 
     assert(available > 0) //select blocks until we have channel activity
                           //so this is just a sanity check
 
-    val iter = selector.selectedKeys().iterator()
+
+    val writable: collection.mutable.Set[SelectionKey] = SystemSelector.selectedKeys().filter{_.isWritable}
+    val iter = SystemSelector.selectedKeys().iterator()
     while(iter.hasNext){
       val key = iter.next()
-      if ( key.isReadable){ doRead(key)}
+      if ( key.isReadable){ doRead(key, writable)}
       else if (key.isAcceptable){ doAccept(key, serverChannel) }
       else if (key.isWritable){ doWrite(key)}
 
       iter.remove() //key has been handled, remove it from selection group
     }
+  }
+
+  /**
+    * monitor an external SocketChannel in this server's event loop
+    * @param channel the channel to monitor
+    * @param interestOps the operations to monitor
+    */
+  def monitor(channel: SocketChannel, interestOps: Int = SelectionKey.OP_READ): TCPConnection = {
+    if(channel.isBlocking){
+      throw new Error("blocking socket channels are not allowed")
+    }
+    val key = Option(channel.keyFor(SystemSelector)) getOrElse channel.register(SystemSelector, interestOps)
+
+    val connection = new TCPConnection(UUID.randomUUID, key, channel)
+    val codecImpl = builder.build(connection)
+    key.attach(codecImpl)
+    connection
   }
 
   /**
@@ -100,12 +124,12 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
     }catch{
       case ioe: java.io.IOException => { 
           println(s"ERROR: caught ${ioe.getMessage} when trying to ACCEPT")
-          key.cancel()
+          key cancel()
           key attach null   //detach TCPConnection object
-          return()
+          return ()
         }
     }
-    assert(channel != null)  //shouldn't happen because the selector 
+    assert(channel != null)  //shouldn't happen because the SystemSelector 
                              //tells us that we had a pending connection
                              //and we handle IO exception above
 
@@ -116,11 +140,11 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
     //make it non-blocking
     channel.configureBlocking(false)
 
-    //register this channel with the event loop's selector and 
+    //register this channel with the event loop's SystemSelector and 
     //attach protocol implementation to channel
     //all channels are monitored for READability 
-    channel.register(selector, SelectionKey.OP_READ,impl)
-    //protocol.connectionMade(transport)
+    channel.register(SystemSelector, SelectionKey.OP_READ,impl)
+    connHandlers.foreach{_(transport)}
   }
 
   /**
@@ -132,7 +156,7 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
       if(codec.needs_write)
       {
         //do the write
-        codec.write()
+        codec.connection.writeBuffered()
       }
       else
       {
@@ -148,9 +172,14 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
   * for encoding and processing and then trigger read callbacks
   * @param key the SelectionKey which is ready for a read
   */
-  private def doRead(key: SelectionKey){
+  private def doRead(key: SelectionKey, writableKeys: collection.mutable.Set[SelectionKey]){
 
     val codec = key.attachment.asInstanceOf[T]
+    val downstream_writable = codec.connection.downStream.forall{ writableKeys.contains(_) }
+    if(! downstream_writable){
+      //suppress read since downstream is not writabl
+      println("downstream is not writable, suppressing read")
+    }
 
     for {
       bytes <- codec.connection.read()
@@ -161,12 +190,12 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
 
   /**
   * Close the server socket channel and stop accepting new requests
-  * @param forceClose if true, close all existing client connections and shutdown the selector
+  * @param closeExistingConnections if true, close all existing client connections and shutdown the SystemSelector
   */
   def shutdown(closeExistingConnections: Boolean = false)={
     serverChannel.close() //stop accepting new connections
     if(closeExistingConnections){ //close all active connections
-      val iter = selector.keys().iterator()
+      val iter = SystemSelector.keys().iterator()
       while(iter.hasNext){
         val key = iter.next()
         try{
@@ -175,7 +204,7 @@ final class TCPServer[T <: TCPCodec](private val builder: ProtocolBuilder[T]){
           case exn: Exception => println("caught: " +  exn.getMessage() + " while trying to close a client channel")
         }
       }
-      selector.close()
+      SystemSelector.close()
     }
   }
 }

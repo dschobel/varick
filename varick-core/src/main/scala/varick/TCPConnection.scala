@@ -13,7 +13,7 @@ object TCPConnection{
   * State and errorhandling for a connected TCP socket
   */
 class TCPConnection (val id: UUID, 
-                         key: SelectionKey, 
+                     val key: SelectionKey, 
                          socket: SocketChannel, 
                          initialWriteBufferSz : Int = 1024, 
                          maxWriteBufferSz: Int = 16 * 1024) {
@@ -23,12 +23,18 @@ class TCPConnection (val id: UUID,
   assert(maxWriteBufferSz >= initialWriteBufferSz)
 
   var writeBuffer: ByteBuffer = ByteBuffer.allocate(initialWriteBufferSz)
+  val downStream = collection.mutable.ArrayBuffer[SelectionKey]()
 
   /**
    * close the TCPConnection's underlying socket  
    */
   def close() = socket.close()
 
+  /**
+   * flowTo make network congestion from sink propagate this connection
+   * @param sink the down-stream TCPConnection
+   */
+  def flowTo(sink: TCPConnection):Unit = downStream += sink.key
 
   /** 
    * Reads data from this TCP socket
@@ -69,22 +75,21 @@ class TCPConnection (val id: UUID,
    * @param data the bytes to write to the socket
    * @return the number of bytes written
    */
-  def write(data: Array[Byte]): Int= {
+  def write(data: Array[Byte]): Int = {
     if(writeBuffer.position() + data.length > maxWriteBufferSz){ throw new java.nio.BufferOverflowException() }
     writeBuffer = ByteBufferUtils.append(writeBuffer,data)
-    write()
+    writeBuffered()
   }
 
   /**
-   * Writes the content of this conn's write buffer to the client 
+   * Non-blocking write for the content of this connections's write buffer
    */
-  def write():Int = {
+  def writeBuffered(): Int = {
     if(needs_write){
       //println(s"write buffer has ${writeBuffer.position} bytes to write" )
       writeBuffer.flip()
       var written = 0
       try{
-        if(socket == null){ println("socket is null...")}
         written = socket.write(writeBuffer)
       }catch{
         case ioe: java.io.IOException => { 
@@ -95,16 +100,14 @@ class TCPConnection (val id: UUID,
         }
       }
       writeBuffer.compact()
-      if(needs_write){
-        //if a socket needs to write more data, register interest with selector
-        //println("registering this socket for OP_WRITE availability")
-        val newops = key.interestOps() & SelectionKey.OP_WRITE
-        key.interestOps(newops)
-      }
+
+      //if a socket needs to write more data, register interest with selector
+      val writeInterest = if (needs_write) SelectionKey.OP_WRITE else ~SelectionKey.OP_WRITE
+      key.interestOps(key.interestOps() & writeInterest)
       written
     }
     else{
-      println("WARN: write buffer is empty. Calling write with empty buffers is probably not what you intended")
+      println("WARN: write buffer is empty. Calling writeBuffered with empty buffers is probably not what you intended")
       0
     }
   }

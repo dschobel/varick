@@ -9,7 +9,7 @@ object EchoServer {
     if(args.length > 0) { port = args.head.toInt }
 
     val echo = net.createServer()
-    echo.onRead{(conn, data) => 
+    echo.onRequest{(conn, data) => 
       {
         println(s"server got: ${new String(data)}")
         conn.write(data)
