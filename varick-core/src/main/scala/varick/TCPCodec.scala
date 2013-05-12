@@ -1,14 +1,13 @@
 package varick
 
-import scala.concurrent.{Future,Promise}
 
 trait ProtocolBuilder[T <: TCPCodec]{
   def build(conn: TCPConnection): T
 }
 
 /**
-  * Represents a codec built on a TCP stream
-  */
+ * Represents a codec built on a TCP stream
+ */
 abstract class TCPCodec(val connection: TCPConnection) {
 
   type ProtocolData 
@@ -23,24 +22,24 @@ abstract class TCPCodec(val connection: TCPConnection) {
    */
   def process(bytes: Array[Byte]): Option[ProtocolData]
 
-  //server asks whether codec wants to write
+  /**
+   * does this codec instance have writable data buffered?
+   * @return true if the underlying connection has writable data buffered, else false
+   */
   def needs_write: Boolean = connection.needs_write
 
-  //server tells us that a socket we previously requested to be monitored for
-  //write capacity is now ready
-
-  //add a handler function which will fire on new connections
+  /**
+   * add a handler function which will fire on new connections
+   */
   def onConnect(handler: Function1[TCPConnection,Unit]) = ()
 
-  //case class WriteTracker(bytesToWrite: Int, promiseToFire: Promise[Unit])
-  //schedule the data to be written
-  //def write(data: Array[Byte]): Future[Unit] = {
+  /**
+   * execute a non-blocking write
+   */
   def write(data: Array[Byte]) = {
     if(data.length == 0){
       println("WARN: no data passed to write method")
     }
-    //val wt = WriteTracker(data.length, Promise[Unit]())
     connection.write(data)
-    //wt.promiseToFire.future
   }
 }

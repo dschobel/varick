@@ -3,6 +3,7 @@ package varick
 import java.nio.channels.{SocketChannel, SelectionKey}
 import java.nio.ByteBuffer
 import java.util.UUID
+import scala.util.{Try,Failure,Success}
 
 object TCPConnection{
   val GlobalReadBufferSz: Int = 1024
@@ -10,8 +11,8 @@ object TCPConnection{
 }
 
 /**
-  * State and errorhandling for a connected TCP socket
-  */
+ * State and errorhandling for a connected TCP socket
+ */
 class TCPConnection (val id: UUID, 
                      val key: SelectionKey, 
                          socket: SocketChannel, 
@@ -23,46 +24,65 @@ class TCPConnection (val id: UUID,
   assert(maxWriteBufferSz >= initialWriteBufferSz)
 
   var writeBuffer: ByteBuffer = ByteBuffer.allocate(initialWriteBufferSz)
-  val downStream = collection.mutable.ArrayBuffer[SelectionKey]()
+  val downStream = collection.mutable.Set[SelectionKey]()
+  var upStream:  Option[TCPConnection] = None
 
   /**
    * close the TCPConnection's underlying socket  
    */
-  def close() = socket.close()
+  def close() = {
+    socket.close()
+    upStream match{
+      case Some(conn) => conn.downStream -= key
+      case _ => ()
+    }
+  }
+
+  case class ByteTracker(var bytesSeen: Int, bytesGoal: Int, promiseToFire: scala.concurrent.Promise[Unit])
+
+  private val ByteTrackers = collection.mutable.ArrayBuffer[ByteTracker]()
+
+  def notifyOnBytes(numBytes: Int): scala.concurrent.Future[Unit] = {
+    Console println s"monitoring for $numBytes bytes"
+    val bt = ByteTracker(0, numBytes, scala.concurrent.Promise[Unit]())
+    ByteTrackers += bt
+    bt.promiseToFire.future
+  }
 
   /**
-   * flowTo make network congestion from sink propagate this connection
+   * flowTo make network congestion from sink propagate to this connection
    * @param sink the down-stream TCPConnection
    */
-  def flowTo(sink: TCPConnection):Unit = downStream += sink.key
+  def flowTo(sink: SocketChannel)(implicit server: TCPServer[_]) = {
+    val wrappedChannel = server monitor sink 
+    downStream += wrappedChannel.key
+    wrappedChannel.upStream = Some(this)
+    wrappedChannel
+  }
 
   /** 
    * Reads data from this TCP socket
    */
-  //def read(handlers: Seq[Function2[TCPConnection,Array[Byte],Unit]]) = {
   def read(): Option[Array[Byte]] = {
-      var bytesRead = 0
-      TCPConnection.GlobalReadBuffer.clear()
-      try{
-        bytesRead = socket.read(TCPConnection.GlobalReadBuffer)
-      } catch{ 
-        case ioe: java.io.IOException => { 
-          println(s"caught ${ioe.getMessage}, closing socket and cancelling key")
-          socket.close(); 
-          key.cancel();
-          return None
-        }
+    TCPConnection.GlobalReadBuffer.clear()
+
+    Try(socket.read(TCPConnection.GlobalReadBuffer)) match {
+      case Failure(e) => {
+        println(s"caught ${e.getMessage}, closing socket and cancelling key")
+        socket.close() 
+        key.cancel()
+        None
       }
-      if (bytesRead >= 0) {
+      case Success(bytesRead: Int) if bytesRead >= 0 => {
         TCPConnection.GlobalReadBuffer.flip()
         val data = TCPConnection.GlobalReadBuffer.array.take(bytesRead)
-        return Some(data)
-
-        //protocol.dataReceived(conn,data)
-        //handlers.foreach{_(this,data)}
-        //println(s"server got: ${new String(data)}")
+        Some(data)
       }
-      else{ socket.close(); return None }
+      case Success(bytesRead: Int) => {
+        socket.close()
+        None
+      }
+    }
   }
 
   /**
@@ -81,30 +101,35 @@ class TCPConnection (val id: UUID,
     writeBuffered()
   }
 
+  private def updateByteTrackers(numBytes: Int): Unit = {
+    ByteTrackers.foreach{ tracker => tracker.bytesSeen += numBytes }
+    val fireable = ByteTrackers.filter{ tracker => tracker.bytesSeen >= tracker.bytesGoal }
+    fireable.foreach { tracker =>  tracker.promiseToFire.success(()); ByteTrackers -= tracker }
+  }
+
   /**
-   * Non-blocking write for the content of this connections's write buffer
-   */
+    * Non-blocking write for the content of this connections's write buffer
+    */
   def writeBuffered(): Int = {
     if(needs_write){
-      //println(s"write buffer has ${writeBuffer.position} bytes to write" )
       writeBuffer.flip()
-      var written = 0
-      try{
-        written = socket.write(writeBuffer)
-      }catch{
-        case ioe: java.io.IOException => { 
-          println(s"ERROR: caught ${ioe.getMessage} when trying to write to $id\n\n${ioe.getStackTrace.take(6).mkString("\n")}")
+      Try(socket.write(writeBuffer)) match{
+        case Failure(e) => {
+          println(s"ERROR: caught ${e.getMessage} when trying to write to $id\n\n${e.getStackTrace.take(6).mkString("\n")}")
           socket.close()
           key.cancel()
-          return -1
+          -1
+        }
+        case Success(bytesWritten: Int) => {
+          writeBuffer.compact()
+
+          //if a socket needs to write more data, register interest with selector
+          val writeInterest = if (needs_write) SelectionKey.OP_WRITE else ~SelectionKey.OP_WRITE
+          key.interestOps(key.interestOps() & writeInterest)
+          updateByteTrackers(bytesWritten)
+          bytesWritten
         }
       }
-      writeBuffer.compact()
-
-      //if a socket needs to write more data, register interest with selector
-      val writeInterest = if (needs_write) SelectionKey.OP_WRITE else ~SelectionKey.OP_WRITE
-      key.interestOps(key.interestOps() & writeInterest)
-      written
     }
     else{
       println("WARN: write buffer is empty. Calling writeBuffered with empty buffers is probably not what you intended")

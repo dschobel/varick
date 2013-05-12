@@ -7,7 +7,6 @@ import org.scalatest.FunSpec
 import org.scalatest.BeforeAndAfter
 import org.scalatest.time.SpanSugar._
 import org.scalatest.concurrent.Timeouts._
-import org.scalatest.concurrent.SocketInterruptor
 
 
 class EchoTests extends FunSpec with BeforeAndAfter {
@@ -18,10 +17,11 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       val port = 3030
       val echo = net.createServer()
 
-      echo.onRead{(conn, data) => conn.write(data) }
+      echo.onRequest{(conn, data) => conn.write(data) }
       echo.listen(new InetSocketAddress(port),blocking = false)
 
       val socket = new Socket("localhost", port)
+      //implicit val killit = new SocketInterruptor(socket)
       val out = new PrintWriter(socket.getOutputStream(), true)
       val in = socket.getInputStream()
       println("client: sending data")
@@ -31,7 +31,6 @@ class EchoTests extends FunSpec with BeforeAndAfter {
       val readBuffer: Array[Byte] = Array.fill(message.length){0}
       var response: Int = 0
       println("client: waiting for data")
-      implicit val killit = new SocketInterruptor(socket)
       failAfter(2 seconds) {
        response = in.read(readBuffer,0,readBuffer.length)
       }

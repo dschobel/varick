@@ -1,7 +1,6 @@
 package varick.http
 
 import java.nio.ByteBuffer
-import collection.mutable.ArrayBuffer
 import org.apache.http.protocol.HttpDateGenerator
 import varick._
 

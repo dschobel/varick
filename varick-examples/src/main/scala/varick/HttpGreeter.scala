@@ -3,7 +3,7 @@ package varick.examples
 import java.util.Date
 import java.net.InetSocketAddress
 import java.text.SimpleDateFormat
-import varick.{TCPCodec,TCPConnection}
+import varick.TCPConnection
 import varick.http._
 
 
